@@ -8,9 +8,9 @@ namespace Horde\Hordectl;
  */
 class HordeInstallationFinder
 {
-    public function __construct()
+    public function __construct(private ?Environment $env)
     {
-
+        $this->env = $env;
     }
 
     /**
@@ -37,6 +37,22 @@ class HordeInstallationFinder
                 return $candidate;
             }
         }
-        throw new \Exception("No Horde found");
+        if (!empty($this->env) && !empty($this->env['HORDE_GIT_DIR'])) {
+            $candidate = $this->env['HORDE_GIT_DIR'] . '/horde/base';
+            if (file_exists($candidate . '/lib/Application.php')) {
+                return $candidate;
+            }
+            if (file_exists($candidate . '/src/Application.php')) {
+                return $candidate;
+            }
+            $candidate = $this->env['HORDE_BASE'];
+            if (file_exists($candidate . '/lib/Application.php')) {
+                return $candidate;
+            }
+            if (file_exists($candidate . '/src/Application.php')) {
+                return $candidate;
+            }
+        }
+        throw new HordeNotFoundException();
     }
 }
