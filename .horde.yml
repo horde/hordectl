@@ -32,6 +32,7 @@ dependencies:
       horde/cli: ^3
       horde/argv: ^3
       horde/yaml: ^3
+      horde/group: ^3
   dev:
     composer:
       horde/test: ^3

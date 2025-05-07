@@ -10,6 +10,8 @@ use \Horde_Cli_Modular as Cli_Modular;
 use \Horde_Cli_Modular_Module as Module;
 use \Horde_Argv_IndentedHelpFormatter as IndentedHelpFormatter;
 use \Horde_Argv_Parser as Parser;
+use Horde_Cli;
+
 /**
  * Hordectl CLI Root Module
  *
@@ -29,6 +31,8 @@ class Cli implements Module
 {
     use HordectlModuleTrait;
     use HasModulesTrait;
+
+    protected Horde_Cli|Modular $cli;
 
     public function __construct(\Horde_Injector $dependencies)
     {
