@@ -27,9 +27,9 @@ trait HordectlModuleTrait {
         $this->_parentModule = $module;
     }
 
-    public function getUsage()
+    public function getUsage(): string
     {
-
+        return '';
     }
 
     public function getBaseOptions()

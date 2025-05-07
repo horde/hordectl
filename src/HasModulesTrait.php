@@ -9,6 +9,8 @@
  * and \Horde_Cli_Modular_ModuleProvider
  */
 namespace Horde\Hordectl;
+use ArrayIterator;
+
 trait HasModulesTrait {
 
     private $_modules = [];
