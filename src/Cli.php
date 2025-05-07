@@ -47,11 +47,15 @@ class Cli implements Module
     public static function main(array $parameters = array())
     {
         // Use plain Horde Injector as long as we have no need to wrap it into something more specific
-        $dependencies = new Dependencies(new TopLevelInjector);
-
         $cli = new \Horde_Cli(array('pager' => true));
-        $dependencies->setInstance('\Horde_Cli', $cli);
-        $dependencies->bootstrapHorde();
+        try {
+            $dependencies = new Dependencies(new TopLevelInjector);
+            $dependencies->setInstance('\Horde_Cli', $cli);
+            $dependencies->bootstrapHorde();
+        } catch (HordeNotFoundException $e) {
+            $cli->writeln("Error: Horde installation not found. Please set the HORDE_GIT_DIR or HORDE_BASE environment variables.");
+            return false;
+        }
 
         // TODO: How to handle uninitialized horde? Not all commands may need a working horde
         // Setup the CLI Parser.

@@ -22,7 +22,8 @@ class Dependencies extends \Horde_Injector
      */
     public function findHordePath()
     {
-        $finder = new HordeInstallationFinder();
+        $env = new Environment(getenv());
+        $finder = new HordeInstallationFinder($env);
         return $finder->find();
     }
 
