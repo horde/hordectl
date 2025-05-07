@@ -1,5 +1,4 @@
 {
-    "minimum-stability": "dev",
     "name": "horde/hordectl",
     "description": "Scenario deployer library",
     "type": "library",
@@ -13,19 +12,20 @@
         }
     ],
     "time": "2025-05-07",
+    "repositories": [],
     "require": {
         "php": "^8.2",
-        "horde/util": "^3 || dev-FRAMEWORK_6_0",
-        "horde/injector": "^3 || dev-FRAMEWORK_6_0",
-        "horde/cli_modular": "^3 || dev-FRAMEWORK_6_0",
-        "horde/cli": "^3 || dev-FRAMEWORK_6_0",
-        "horde/argv": "^3 || dev-FRAMEWORK_6_0",
-        "horde/yaml": "^3 || dev-FRAMEWORK_6_0"
+        "horde/util": "^3",
+        "horde/injector": "^3",
+        "horde/cli_modular": "^3",
+        "horde/cli": "^3",
+        "horde/argv": "^3",
+        "horde/yaml": "^3",
+        "horde/group": "^3"
     },
     "require-dev": {
-        "horde/test": "^3 || dev-FRAMEWORK_6_0",
-        "phpunit/phpunit": "^9 || ^10.5",
-        "horde/group": "^3 || dev-FRAMEWORK_6_0"
+        "horde/test": "^3",
+        "phpunit/phpunit": "^12 || ^11 || ^9 || ^10.5"
     },
     "suggest": {},
     "autoload": {
@@ -42,8 +42,6 @@
         "bin/hordectl"
     ],
     "config": {
-        "allow-plugins": {
-            "horde/horde-installer-plugin": true
-        }
+        "allow-plugins": []
     }
 }

@@ -1,16 +1,18 @@
 ---
-1.0.0alpha5:
-  api: 1.0.0alpha1
+1.0.0-alpha5:
+  api: 1.0.0-alpha1
   state:
-    release: alpha
-    api: alpha
-  date: 2022-11-04
+    release: true
+    api: true
+  date: 2025-05-07
   license:
-    identifier: LGP-2.1
+    identifier: LGPL-2.1
     uri: http://www.horde.org/licenses/lgpl21
-  notes: |+
-    
-1.0.0alpha4:
+  notes: |
+    feat: Present a more human friendly output when horde was not found
+    feat: Find horde installations by HORDE_GIT_DIR or HORDE_BASE environment variables
+    docs: Update readme
+1.0.0-alpha4:
   api: 1.0.0alpha1
   state:
     release: alpha
@@ -20,9 +22,10 @@
     identifier: LGP-2.1
     uri: http://www.horde.org/licenses/lgpl21
   notes: |
+    Original version string was 1.0.0alpha4
     [rla] Enable PHP 8.x compat.
     |+
-1.0.0alpha3:
+1.0.0-alpha3:
   api: 1.0.0alpha1
   state:
     release: alpha
@@ -31,8 +34,10 @@
   license:
     identifier: LGP-2.1
     uri: http://www.horde.org/licenses/lgpl21
-  notes: |+
-1.0.0alpha2:
+  notes: |-
+    Original version string was 1.0.0alpha3
+    |+
+1.0.0-alpha2:
   api: 1.0.0alpha1
   state:
     release: alpha
@@ -42,10 +47,11 @@
     identifier: LGP-2.1
     uri: http://www.horde.org/licenses/lgpl21
   notes: |
+    Original version string was 1.0.0alpha2
     [rla] Use horde's native bootstrapping.
     [rla] Make help command more useful.
     |+
-1.0.0alpha1:
+1.0.0-alpha1:
   api: 1.0.0alpha1
   state:
     release: alpha
@@ -54,4 +60,6 @@
   license:
     identifier: LGP-2.1
     uri: http://www.horde.org/licenses/lgpl21
-  notes: Initialize Module
+  notes: |-
+    Original version string was 1.0.0alpha1
+    Initialize Module
