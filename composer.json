@@ -12,9 +12,9 @@
             "role": "lead"
         }
     ],
-    "time": "2022-11-04",
+    "time": "2025-05-07",
     "require": {
-        "php": "^7.4 || ^8",
+        "php": "^8.2",
         "horde/util": "^3 || dev-FRAMEWORK_6_0",
         "horde/injector": "^3 || dev-FRAMEWORK_6_0",
         "horde/cli_modular": "^3 || dev-FRAMEWORK_6_0",
@@ -24,7 +24,7 @@
     },
     "require-dev": {
         "horde/test": "^3 || dev-FRAMEWORK_6_0",
-        "phpunit/phpunit": "^9 || ^10"
+        "phpunit/phpunit": "^9 || ^10.5"
     },
     "suggest": {},
     "autoload": {
