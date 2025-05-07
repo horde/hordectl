@@ -3,7 +3,63 @@
 Deploy scenarios for end to end tests from yaml files
 Patch desired configurations into horde backends without touching unrelated content
 
-## Usage examples
+## Install into your Horde 6 deployment
+
+cd /var/www/horde-dev
+composer require horde/hordectl
+
+## Basic Usage
+
+### Show available horde apps
+
+7root@cdcead205371:/var/www/horde-dev# ./vendor/bin/hordectl help
+Help
+Found Horde at: /var/www/horde-dev/web/horde
+Found Application:        horde (active)
+Found Application:          imp (inactive)
+Found Application:         ingo (inactive)
+Found Application:          sam (inactive)
+Found Application:    kronolith (inactive)
+Found Application:        turba (inactive)
+Found Application:          nag (inactive)
+Found Application:        mnemo (inactive)
+Found Application:        trean (inactive)
+Found Application:        ansel (inactive)
+Found Application:       wicked (inactive)
+Found Application:        chora (inactive)
+Found Application:        whups (inactive)
+Found Application:        luxor (inactive)
+Found Application:        klutz (inactive)
+Found Application:        jonah (inactive)
+Found Application:       hermes (inactive)
+Found Application:        sesha (inactive)
+Found Application:        kolab (inactive)
+Found Application:       gollem (inactive)
+Found Application:       passwd (inactive)
+Found Application:        agora (inactive)
+Found Application:      ulaform (inactive)
+Found Application:        vilma (inactive)
+Found Application:      content (inactive)
+Found Application:  timeobjects (inactive)
+
+
+### Inject a user or change his password (AKA:  Help! I have locked myself out of horde)
+
+If your horde authentication backend allows setting passwords through horde ...
+
+- SQL Authentication
+- Some types of LDAP/AD authentication with password change option
+- Some types of IMAP setup
+
+You can change the password for an existing user or inject a new user into horde.
+This is also useful for automated deployment.
+You can configure horde to use the SQL backend, migrate up the database schema from zero and inject an admin user.
+
+```
+    hordectl patch user fritz mysecretpassword
+```
+
+Remember, this only works if the auth backend supports it.
 
 ### Export resources to a yaml file
 
@@ -27,12 +83,6 @@ Order might be significant. Permissions won't accept group permissions for group
 Some backends may be readonly and will not allow adding/changing some resources.
 
 See doc dir for detailed explanations of possible input formats and their semantics
-
-### Inject a user or change his password
-
-    hordectl patch user fritz mysecretpassword
-
-This only works if the auth backend supports it.
 
 ## Intended uses
 
