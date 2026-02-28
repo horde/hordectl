@@ -6,6 +6,7 @@
 namespace Horde\Hordectl;
 use Horde\Injector\Injector;
 use Horde\Injector\TopLevel;
+use Horde\Exception\HordeException;
 use \Horde_Cli_Modular as Cli_Modular;
 use \Horde_Cli_Modular_Module as Module;
 use \Horde_Argv_IndentedHelpFormatter as IndentedHelpFormatter;
@@ -94,7 +95,7 @@ class Cli implements Module
             foreach ($this->listModules() as $class => $module) {
                 $ran |= $module->handle($argv);
             }
-        } catch (\Horde_Exception $e) {
+        } catch (HordeException $e) {
             return false;
         }
 

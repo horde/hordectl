@@ -2,6 +2,7 @@
 namespace Horde\Hordectl\Compat;
 use \Horde_String;
 use \Horde;
+use Horde\Exception\HordeException;
 /**
  * A Horde_Injector:: based Horde_Prefs:: factory.
  *
@@ -82,7 +83,7 @@ class Horde_Core_Factory_Prefs extends \Horde_Core_Factory_Base
                     break;
                 }
                 $driver = $this->_getDriverName($driver, 'Horde_Prefs_Storage');
-            } catch (Horde_Exception $e) {
+            } catch (HordeException $e) {
                 $this->_notifyError($e);
                 $driver = 'Horde_Prefs_Storage_Null';
                 $opts['cache'] = false;
@@ -145,7 +146,7 @@ class Horde_Core_Factory_Prefs extends \Horde_Core_Factory_Base
 
             case 'Horde_Prefs_Storage_KolabImap':
                 if ($registry->isAdmin()) {
-                    throw new Horde_Exception('The IMAP based Kolab preferences backend is unavailable for system administrators.');
+                    throw new HordeException('The IMAP based Kolab preferences backend is unavailable for system administrators.');
                 }
                 $params['kolab'] = $this->_injector
                     ->getInstance('Horde_Kolab_Storage');
@@ -160,7 +161,7 @@ class Horde_Core_Factory_Prefs extends \Horde_Core_Factory_Base
                     ->getInstance('Horde_Core_Factory_Imsp')->create('Options', $imspParams);
             }
             $this->storage = new $driver($opts['user'], $params);
-        } catch (Horde_Exception $e) {
+        } catch (HordeException $e) {
             $this->_notifyError($e);
             $driver = 'Horde_Prefs_Storage_Null';
             $this->storage = new $driver($opts['user'], $params);
