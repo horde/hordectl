@@ -5,6 +5,7 @@ use \Horde_Cli_Modular_Module as Module;
 use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
+use Horde\Argv\Parser;
 /**
  *
  * Help command module implements CLI help/usage
@@ -15,7 +16,7 @@ implements Module, ModuleUsage
     use ModuleTrait;
 
     protected \Horde_Cli $cli;
-    protected \Horde_Argv_Parser $parser;
+    protected Parser $parser;
 
     public function __construct(Injector $dependencies)
     {

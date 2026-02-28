@@ -7,7 +7,7 @@ namespace Horde\Hordectl\Test;
 use Horde\Hordectl\Cli;
 use Horde\Injector\Injector;
 use Horde_Cli;
-use Horde_Argv_Parser;
+use Horde\Argv\Parser;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -27,7 +27,7 @@ class CliTest extends TestCase
     {
         $this->mockInjector = $this->createMock(Injector::class);
         $this->mockCli = $this->createMock(Horde_Cli::class);
-        $this->mockParser = $this->createMock(Horde_Argv_Parser::class);
+        $this->mockParser = $this->createMock(Parser::class);
 
         // Setup default mock behavior
         $this->mockInjector->method('getInstance')

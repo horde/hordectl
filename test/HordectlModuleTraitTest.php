@@ -6,9 +6,9 @@ namespace Horde\Hordectl\Test;
 
 use Horde\Hordectl\HordectlModuleTrait;
 use Horde_Cli_Modular_Module;
-use Horde_Argv_Parser;
-use Horde_Argv_Option;
-use Horde_Argv_OptionGroup;
+use Horde\Argv\Parser;
+use Horde\Argv\Option;
+use Horde\Argv\OptionGroup;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -29,7 +29,7 @@ class HordectlModuleTraitTest extends TestCase
 
             public function __construct()
             {
-                $this->_parser = new Horde_Argv_Parser();
+                $this->_parser = new Parser();
             }
 
             // Expose protected properties for testing
@@ -134,7 +134,7 @@ class HordectlModuleTraitTest extends TestCase
 
             public function __construct()
             {
-                $this->_parser = new Horde_Argv_Parser();
+                $this->_parser = new Parser();
                 $this->_parser->allowInterspersedArgs = false;
             }
 
@@ -162,7 +162,7 @@ class HordectlModuleTraitTest extends TestCase
 
             public function __construct()
             {
-                $this->_parser = new Horde_Argv_Parser();
+                $this->_parser = new Parser();
                 $this->_parser->allowInterspersedArgs = false;
             }
 
@@ -189,7 +189,7 @@ class HordectlModuleTraitTest extends TestCase
 
             public function __construct()
             {
-                $this->_parser = new Horde_Argv_Parser();
+                $this->_parser = new Parser();
                 $this->_parser->allowInterspersedArgs = false;
             }
 
@@ -201,7 +201,7 @@ class HordectlModuleTraitTest extends TestCase
             public function getBaseOptions()
             {
                 return [
-                    new Horde_Argv_Option('-t', '--test', ['dest' => 'test'])
+                    new Option('-t', '--test', ['dest' => 'test'])
                 ];
             }
 

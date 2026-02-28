@@ -8,6 +8,8 @@ use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait;
 use Horde\Yaml\Yaml;
 use Horde\Injector\Injector;
+use Horde\Argv\Option;
+use Horde\Argv\Parser;
 
 /**
  *
@@ -38,7 +40,7 @@ class Import implements Module, ModuleUsage
     {
         return
             [
-                new \Horde_Argv_Option(
+                new Option(
                     '-f',
                     '--filename',
                     [
@@ -78,8 +80,8 @@ class Import implements Module, ModuleUsage
             return false;
         }
 
-        $parser = new \Horde_Argv_Parser();
-        $parser->addOption(new \Horde_Argv_Option('-f', '--filename', ['dest' => 'filename']));
+        $parser = new Parser();
+        $parser->addOption(new Option('-f', '--filename', ['dest' => 'filename']));
         $parser->allowInterspersedArgs = false;
 
         list($myArgs, $moduleArgs) = $this->handleCommandline($argv);

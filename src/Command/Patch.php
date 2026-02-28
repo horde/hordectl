@@ -6,6 +6,8 @@ use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use \Horde\Hordectl\HasModulesTrait;
 use Horde\Injector\Injector;
+use Horde\Argv\Option;
+use Horde\Argv\Parser;
 /**
  *
  * Command module to manipulate single resource entities
@@ -28,9 +30,9 @@ implements Module, ModuleUsage
 
     public function getBaseOptions()
     {
-        return 
+        return
             [
-                new \Horde_Argv_Option(
+                new Option(
                     '-f',
                     '--filename',
                     [
@@ -60,7 +62,7 @@ implements Module, ModuleUsage
             return false;
         }
     
-        $parser = new \Horde_Argv_Parser();
+        $parser = new Parser();
         $parser->allowInterspersedArgs = false;
 
         list($myArgs, $moduleArgs) = $this->handleCommandline($argv);

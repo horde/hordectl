@@ -7,7 +7,7 @@ namespace Horde\Hordectl\Test\Command;
 use Horde\Hordectl\Command\Help;
 use Horde\Hordectl\Dependencies;
 use Horde_Cli;
-use Horde_Argv_Parser;
+use Horde\Argv\Parser;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -27,7 +27,7 @@ class HelpTest extends TestCase
     {
         $this->mockInjector = $this->createMock(Dependencies::class);
         $this->mockCli = $this->createMock(Horde_Cli::class);
-        $this->mockParser = $this->createMock(Horde_Argv_Parser::class);
+        $this->mockParser = $this->createMock(Parser::class);
 
         // Setup default mock behavior for basic constructor needs
         // Note: Tests can override this by calling method() again
@@ -178,7 +178,7 @@ class HelpTest extends TestCase
         // Create a fresh mock for this test with custom registry
         $mockInjector = $this->createMock(Dependencies::class);
         $mockCli = $this->createMock(Horde_Cli::class);
-        $mockParser = $this->createMock(Horde_Argv_Parser::class);
+        $mockParser = $this->createMock(Parser::class);
 
         $mockRegistry = new \stdClass();
         $mockRegistry->applications = [
