@@ -14,18 +14,23 @@ namespace Horde\Hordectl\Command\Configure;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\ConfigHelper;
+use Horde\Hordectl\ConfigManager;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
+use RuntimeException;
 
 /**
  * Configure permissions system
  *
- * This is a stub implementation that will be expanded to:
- * - Configure permissions backend
- * - Set up default permissions
- * - Manage application permissions
- * - Grant/revoke permissions
+ * Provides interactive and command-line modes for configuring Horde
+ * permissions backend. Supports SQL backend with caching options.
+ *
+ * Usage:
+ *   hordectl configure permissions                    # Interactive mode
+ *   hordectl configure perms --show                   # Show current config
+ *   hordectl configure perms --driver sql ...         # CLI mode
  *
  * @author Ralf Lang <lang@b1-systems.de>
  */
@@ -34,11 +39,13 @@ class Permissions implements Module, ModuleUsage
     use ModuleTrait;
 
     protected \Horde_Cli $cli;
+    private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
     }
@@ -47,18 +54,41 @@ class Permissions implements Module, ModuleUsage
     {
         return [
             new Option(
-                '--test',
-                [
-                    'action' => 'store_true',
-                    'help' => 'Test permissions backend'
-                ]
-            ),
-            new Option(
-                '--grant',
+                '--driver',
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Grant permission (format: user:permission)'
+                    'help' => 'Permissions driver (sql, mock)'
+                ]
+            ),
+            new Option(
+                '--cache',
+                [
+                    'action' => 'store',
+                    'type' => 'string',
+                    'help' => 'Enable caching (true/false)'
+                ]
+            ),
+            new Option(
+                '--cache-lifetime',
+                [
+                    'action' => 'store',
+                    'type' => 'int',
+                    'help' => 'Cache lifetime in seconds'
+                ]
+            ),
+            new Option(
+                '--interactive',
+                [
+                    'action' => 'store_true',
+                    'help' => 'Interactive mode with prompts'
+                ]
+            ),
+            new Option(
+                '--show',
+                [
+                    'action' => 'store_true',
+                    'help' => 'Show current permissions configuration'
                 ]
             ),
         ];
@@ -79,37 +109,210 @@ class Permissions implements Module, ModuleUsage
 
         list($opts, $args) = $this->handleCommandline($argv);
 
+        try {
+            // Get installation directory
+            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            if (!$installDir) {
+                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+            }
+
+            // Create ConfigHelper
+            $helper = new ConfigHelper('horde', $installDir);
+
+            // Show current configuration
+            if ($opts->show ?? false) {
+                $this->showCurrentConfig($helper);
+                return true;
+            }
+
+            // Determine mode: interactive or CLI arguments
+            if (($opts->interactive ?? false) || !$this->hasConfigOptions($opts)) {
+                $this->interactiveMode($helper);
+            } else {
+                $this->cliMode($helper, $opts);
+            }
+
+            // Save configuration
+            $this->cli->writeln();
+            $helper->save();
+            $this->cli->message('✓ Permissions configuration saved', 'cli.success');
+            $this->cli->message('  Backup created: ' . basename($helper->getBackupFile()), 'cli.message');
+            $this->cli->writeln();
+
+            return true;
+        } catch (RuntimeException $e) {
+            $this->cli->fatal($e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if any configuration options were provided
+     *
+     * @param object $opts Parsed options
+     * @return bool True if configuration options present
+     */
+    private function hasConfigOptions(object $opts): bool
+    {
+        return isset($opts->driver) || isset($opts->cache) || isset($opts->cache_lifetime);
+    }
+
+    /**
+     * Interactive mode with prompts
+     *
+     * @param ConfigHelper $helper Configuration helper
+     */
+    private function interactiveMode(ConfigHelper $helper): void
+    {
         $this->cli->writeln();
-        $this->cli->writeln('Permissions Configuration (STUB)');
-        $this->cli->writeln('=================================');
-        $this->cli->writeln();
-        $this->cli->writeln('This is a stub implementation.');
-        $this->cli->writeln();
-        $this->cli->writeln('Future functionality:');
-        $this->cli->writeln('  • Configure permissions backend (SQL, LDAP, etc.)');
-        $this->cli->writeln('  • Test permissions functionality');
-        $this->cli->writeln('  • Set up default application permissions');
-        $this->cli->writeln('  • Grant/revoke permissions for users/groups');
-        $this->cli->writeln('  • List all permissions and assignments');
-        $this->cli->writeln('  • Check user permissions');
-        $this->cli->writeln('  • Import/export permission sets');
+        $this->cli->writeln('Permissions System Configuration (Interactive Mode)');
+        $this->cli->writeln('===================================================');
         $this->cli->writeln();
 
-        if ($opts->test ?? false) {
-            $this->cli->writeln('Would test permissions backend here...');
-            $this->cli->writeln();
+        $this->cli->writeln('Available permissions drivers:');
+        $this->cli->writeln('  sql  - SQL database backend (uses main database)');
+        $this->cli->writeln('  mock - Mock driver for testing');
+        $this->cli->writeln();
+
+        $currentDriver = $helper->getValue('perms.driver') ?? 'sql';
+        $driver = $this->cli->prompt(
+            'Permissions driver:',
+            $currentDriver
+        );
+        $helper->setValue('perms.driver', $driver);
+
+        $this->cli->writeln();
+        $this->cli->writeln('Caching settings:');
+        $this->cli->writeln('(Caching improves performance for frequently checked permissions)');
+        $this->cli->writeln();
+
+        $currentCache = $helper->getValue('perms.cache') ?? true;
+        $cache = $this->promptBoolean(
+            'Enable caching?',
+            $currentCache
+        );
+        $helper->setValue('perms.cache', $cache);
+
+        if ($cache) {
+            $currentLifetime = $helper->getValue('perms.cache_lifetime') ?? 300;
+            $lifetime = $this->cli->prompt(
+                'Cache lifetime in seconds:',
+                (string)$currentLifetime
+            );
+            $helper->setValue('perms.cache_lifetime', (int)$lifetime);
         }
 
-        if ($opts->grant ?? false) {
-            $this->cli->writeln("Would grant permission: {$opts->grant}");
+        if ($driver === 'sql') {
+            $this->cli->writeln();
+            $this->cli->message('Note: SQL driver uses the main database configuration.', 'cli.message');
+            $this->cli->writeln('      Run "hordectl configure database" to configure the database.');
             $this->cli->writeln();
         }
+    }
 
-        $this->cli->writeln('Options:');
-        $this->cli->writeln('  --test             Test permissions backend');
-        $this->cli->writeln('  --grant USER:PERM  Grant permission');
+    /**
+     * CLI mode with command-line arguments
+     *
+     * @param ConfigHelper $helper Configuration helper
+     * @param object $opts Parsed options
+     */
+    private function cliMode(ConfigHelper $helper, object $opts): void
+    {
+        $this->cli->writeln();
+        $this->cli->writeln('Updating permissions configuration...');
         $this->cli->writeln();
 
-        return true;
+        if (isset($opts->driver)) {
+            $helper->setValue('perms.driver', $opts->driver);
+            $this->cli->writeln("  Permissions driver: {$opts->driver}");
+        }
+
+        if (isset($opts->cache)) {
+            $value = $this->parseBoolean($opts->cache);
+            $helper->setValue('perms.cache', $value);
+            $this->cli->writeln("  Caching: " . ($value ? 'enabled' : 'disabled'));
+        }
+
+        if (isset($opts->cache_lifetime)) {
+            $helper->setValue('perms.cache_lifetime', $opts->cache_lifetime);
+            $this->cli->writeln("  Cache lifetime: {$opts->cache_lifetime} seconds");
+        }
+    }
+
+    /**
+     * Show current permissions configuration
+     *
+     * @param ConfigHelper $helper Configuration helper
+     */
+    private function showCurrentConfig(ConfigHelper $helper): void
+    {
+        $this->cli->writeln();
+        $this->cli->writeln('Current Permissions Configuration');
+        $this->cli->writeln('==================================');
+        $this->cli->writeln();
+
+        $perms = $helper->getValue('perms');
+
+        if (empty($perms)) {
+            $this->cli->message('No permissions configuration found.', 'cli.warning');
+            $this->cli->writeln('Using defaults: SQL driver with caching enabled.');
+            $this->cli->writeln();
+            return;
+        }
+
+        $this->cli->writeln('Backend:');
+        $this->cli->writeln('  Driver:         ' . ($perms['driver'] ?? 'sql'));
+
+        $this->cli->writeln();
+        $this->cli->writeln('Caching:');
+        $this->cli->writeln('  Enabled:        ' . $this->formatBoolean($perms['cache'] ?? true));
+        $this->cli->writeln('  Lifetime:       ' . ($perms['cache_lifetime'] ?? 300) . ' seconds');
+
+        $this->cli->writeln();
+        $this->cli->writeln('Notes:');
+        $driver = $perms['driver'] ?? 'sql';
+        if ($driver === 'sql') {
+            $this->cli->writeln('  SQL driver uses the main database configuration.');
+            $this->cli->writeln('  Run "hordectl configure database --show" to view database settings.');
+        }
+
+        $this->cli->writeln();
+    }
+
+    /**
+     * Prompt for boolean value
+     *
+     * @param string $prompt Prompt text
+     * @param bool $default Default value
+     * @return bool User response
+     */
+    private function promptBoolean(string $prompt, bool $default): bool
+    {
+        $defaultStr = $default ? 'Y/n' : 'y/N';
+        $response = $this->cli->prompt("{$prompt} [{$defaultStr}]:", $default ? 'y' : 'n');
+        return strtolower($response) === 'y';
+    }
+
+    /**
+     * Parse boolean from string
+     *
+     * @param string $value String value
+     * @return bool Boolean value
+     */
+    private function parseBoolean(string $value): bool
+    {
+        $lower = strtolower($value);
+        return in_array($lower, ['true', '1', 'yes', 'y', 'on']);
+    }
+
+    /**
+     * Format boolean for display
+     *
+     * @param bool $value Boolean value
+     * @return string Formatted string
+     */
+    private function formatBoolean(bool $value): string
+    {
+        return $value ? 'yes' : 'no';
     }
 }
