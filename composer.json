@@ -21,7 +21,8 @@
         "horde/cli": "^3 || dev-FRAMEWORK_6_0",
         "horde/argv": "^3 || dev-FRAMEWORK_6_0",
         "horde/yaml": "^3 || dev-FRAMEWORK_6_0",
-        "horde/group": "^3 || dev-FRAMEWORK_6_0"
+        "horde/group": "^3 || dev-FRAMEWORK_6_0",
+        "horde/phpconfigfile": "^1 || dev-FRAMEWORK_6_0"
     },
     "require-dev": {
         "horde/test": "^3 || dev-FRAMEWORK_6_0",
@@ -41,7 +42,9 @@
     "bin": [
         "bin/hordectl"
     ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "config": {
-        "allow-plugins": []
+        "allow-plugins": {}
     }
 }
