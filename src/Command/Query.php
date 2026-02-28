@@ -61,10 +61,12 @@ implements Module, ModuleUsage
         }
         $writer = $this->dependencies->getInstance('\Horde\Hordectl\YamlWriter');
         list($myArgs, $moduleArgs) = $this->handleCommandline($argv);
+        $res = false;
         foreach ($this->listModules() as $module) {
             $res |= $module->handle($moduleArgs);
         }
         $this->cli->writeln($writer->dump());
-        return $res;
+        // Always return true since we output something
+        return true;
     }
 }

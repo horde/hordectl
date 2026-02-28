@@ -100,10 +100,9 @@ class CliTest extends TestCase
     {
         $cli = new Cli($this->mockInjector);
 
-        // Expect error message when no module runs
-        $this->mockCli->expects($this->once())
-            ->method('message')
-            ->with('No Module ran', 'cli.error');
+        // Expect usage output when no module runs (via writeln calls)
+        $this->mockCli->expects($this->atLeastOnce())
+            ->method('writeln');
 
         $result = $cli->handle([]);
         $this->assertFalse($result);

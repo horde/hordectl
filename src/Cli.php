@@ -115,10 +115,49 @@ class Cli implements Module
 
         // Something didn't work as expected.
         if (!$ran) {
-            // TODO: Get more useful help
-            $this->cli->message('No Module ran', 'cli.error');
+            $this->showUsage();
         }
         return $ran;
+    }
+
+    /**
+     * Show usage information when no module handles the command
+     */
+    protected function showUsage(): void
+    {
+        $this->cli->writeln();
+        $this->cli->writeln('Usage: hordectl [OPTIONS] COMMAND [ARGUMENTS]');
+        $this->cli->writeln();
+        $this->cli->writeln('Available commands:');
+
+        foreach ($this->listModules() as $class => $module) {
+            // Get module name - extract from class name if getTitle() not available
+            if (method_exists($module, 'getTitle')) {
+                $name = strtolower($module->getTitle());
+            } else {
+                $name = strtolower(basename(str_replace('\\', '/', $class)));
+            }
+            $this->cli->writeln('  ' . str_pad($name, 15) . ' ' . $this->getModuleDescription($name));
+        }
+
+        $this->cli->writeln();
+        $this->cli->writeln('Run \'hordectl help\' for more information.');
+        $this->cli->writeln();
+    }
+
+    /**
+     * Get a brief description for a module
+     */
+    protected function getModuleDescription(string $name): string
+    {
+        $descriptions = [
+            'help' => 'Show help and list available applications',
+            'query' => 'Query and export Horde resources as YAML',
+            'import' => 'Import resources into Horde from YAML',
+            'patch' => 'Modify individual Horde resources',
+        ];
+
+        return $descriptions[$name] ?? '';
     }
 
    /**

@@ -88,7 +88,14 @@ class Import implements Module, ModuleUsage
         // identify yaml file or input stream
         // TODO: Handle "-" or console input redirects
         if (!$myArgs->filename) {
-            $this->cli->message('No Module ran', 'cli.error');
+            $this->cli->writeln();
+            $this->cli->writeln('Usage: hordectl import -f FILE');
+            $this->cli->writeln();
+            $this->cli->writeln('Import resources into Horde from a YAML file.');
+            $this->cli->writeln();
+            $this->cli->writeln('Options:');
+            $this->cli->writeln('  -f, --filename FILE    YAML file to import (required)');
+            $this->cli->writeln();
             return false;
         }
         if (!is_file($myArgs->filename)) {
