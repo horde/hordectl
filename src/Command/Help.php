@@ -4,6 +4,7 @@ namespace Horde\Hordectl\Command;
 use \Horde_Cli_Modular_Module as Module;
 use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Injector\Injector;
 /**
  *
  * Help command module implements CLI help/usage
@@ -16,7 +17,7 @@ implements Module, ModuleUsage
     protected \Horde_Cli $cli;
     protected \Horde_Argv_Parser $parser;
 
-    public function __construct(\Horde_Injector $dependencies)
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');

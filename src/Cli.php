@@ -4,8 +4,8 @@
  */
 
 namespace Horde\Hordectl;
-use \Horde_Injector as Injector;
-use \Horde_Injector_TopLevel as TopLevelInjector;
+use Horde\Injector\Injector;
+use Horde\Injector\TopLevel;
 use \Horde_Cli_Modular as Cli_Modular;
 use \Horde_Cli_Modular_Module as Module;
 use \Horde_Argv_IndentedHelpFormatter as IndentedHelpFormatter;
@@ -34,7 +34,7 @@ class Cli implements Module
 
     protected Horde_Cli|Modular $cli;
 
-    public function __construct(\Horde_Injector $dependencies)
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
@@ -53,7 +53,7 @@ class Cli implements Module
         // Use plain Horde Injector as long as we have no need to wrap it into something more specific
         $cli = new \Horde_Cli(array('pager' => true));
         try {
-            $dependencies = new Dependencies(new TopLevelInjector);
+            $dependencies = new Dependencies(new TopLevel);
             $dependencies->setInstance('\Horde_Cli', $cli);
             $dependencies->bootstrapHorde();
         } catch (HordeNotFoundException $e) {
@@ -110,7 +110,7 @@ class Cli implements Module
      * Prepare the modular CLI instance.
      *
      * Adapted from Horde git-tools CLI
-     * @param  \Horde_Injector $dependencies  The dependency container.
+     * @param  Injector $dependencies  The dependency container.
      *
      * @return \Horde_Cli_Modular  The modular CLI object.
      */

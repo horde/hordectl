@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Horde\Hordectl\Test;
 
 use Horde\Hordectl\Cli;
-use Horde_Injector;
+use Horde\Injector\Injector;
 use Horde_Cli;
 use Horde_Argv_Parser;
 use PHPUnit\Framework\TestCase;
@@ -25,7 +25,7 @@ class CliTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockInjector = $this->createMock(Horde_Injector::class);
+        $this->mockInjector = $this->createMock(Injector::class);
         $this->mockCli = $this->createMock(Horde_Cli::class);
         $this->mockParser = $this->createMock(Horde_Argv_Parser::class);
 

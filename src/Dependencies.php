@@ -4,8 +4,9 @@
  */
 namespace Horde\Hordectl;
 use \Horde\Hordectl\Configuration\AppConfigReader;
+use Horde\Injector\Injector;
 
-class Dependencies extends \Horde_Injector
+class Dependencies extends Injector
 {
     protected $hordeBootstrapped = false;
 

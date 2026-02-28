@@ -5,6 +5,7 @@ namespace Horde\Hordectl\Command\Import;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Injector\Injector;
 
 /**
  *
@@ -15,7 +16,7 @@ class App implements Module, ModuleUsage
     use ModuleTrait;
 
     protected \Horde_Cli $cli;
-    public function __construct(\Horde_Injector $dependencies)
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');

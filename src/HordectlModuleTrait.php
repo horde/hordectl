@@ -4,9 +4,11 @@
  *
  */
 namespace Horde\Hordectl;
+use Horde\Injector\Injector;
+
 trait HordectlModuleTrait {
 
-    protected \Horde_Injector $dependencies;
+    protected Injector $dependencies;
     private $_parentModule;
     private $_parsed;
     private $_positional;
