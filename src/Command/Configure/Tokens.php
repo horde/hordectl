@@ -38,6 +38,7 @@ use RuntimeException;
 class Tokens implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use ConfigureHelperTrait;
 
     protected \Horde_Cli $cli;
     private ConfigManager $configManager;
@@ -356,19 +357,5 @@ class Tokens implements Module, ModuleUsage
             $days = round($seconds / 86400);
             return "{$days}d";
         }
-    }
-
-    /**
-     * Prompt for boolean value
-     *
-     * @param string $prompt Prompt text
-     * @param bool $default Default value
-     * @return bool User response
-     */
-    private function promptBoolean(string $prompt, bool $default): bool
-    {
-        $defaultStr = $default ? 'Y/n' : 'y/N';
-        $response = $this->cli->prompt("{$prompt} [{$defaultStr}]:", $default ? 'y' : 'n');
-        return strtolower($response) === 'y';
     }
 }

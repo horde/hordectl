@@ -37,6 +37,7 @@ use RuntimeException;
 class Groups implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use ConfigureHelperTrait;
 
     protected \Horde_Cli $cli;
     private ConfigManager $configManager;
@@ -288,42 +289,5 @@ class Groups implements Module, ModuleUsage
         }
 
         $this->cli->writeln();
-    }
-
-    /**
-     * Prompt for boolean value
-     *
-     * @param string $prompt Prompt text
-     * @param bool $default Default value
-     * @return bool User response
-     */
-    private function promptBoolean(string $prompt, bool $default): bool
-    {
-        $defaultStr = $default ? 'Y/n' : 'y/N';
-        $response = $this->cli->prompt("{$prompt} [{$defaultStr}]:", $default ? 'y' : 'n');
-        return strtolower($response) === 'y';
-    }
-
-    /**
-     * Parse boolean from string
-     *
-     * @param string $value String value
-     * @return bool Boolean value
-     */
-    private function parseBoolean(string $value): bool
-    {
-        $lower = strtolower($value);
-        return in_array($lower, ['true', '1', 'yes', 'y', 'on']);
-    }
-
-    /**
-     * Format boolean for display
-     *
-     * @param bool $value Boolean value
-     * @return string Formatted string
-     */
-    private function formatBoolean(bool $value): string
-    {
-        return $value ? 'yes' : 'no';
     }
 }
