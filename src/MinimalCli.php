@@ -62,6 +62,17 @@ class MinimalCli
             return $this->reconfigureCommand(array_slice($argv, 1));
         }
 
+        // Check for activate command early (before parser tries to parse its options)
+        if (count($argv) >= 1 && $argv[0] === 'activate') {
+            // Handle activate --help specially
+            if (count($argv) >= 2 && ($argv[1] === '--help' || $argv[1] === '-h')) {
+                $this->showActivateHelp();
+                return 0;
+            }
+            // Pass all args to activate command
+            return $this->activateCommand(array_slice($argv, 1));
+        }
+
         // Parse options for other commands
         list($options, $args) = $this->parser->parseArgs($argv);
 
@@ -97,6 +108,7 @@ class MinimalCli
                 fwrite(STDERR, "  status            Check installation status\n");
                 fwrite(STDERR, "  bootstrap-check   Test if Horde can bootstrap\n");
                 fwrite(STDERR, "  reconfigure       Run installer to configure Horde\n");
+                fwrite(STDERR, "  activate          Activate a configuration preset\n");
                 fwrite(STDERR, "\n");
                 return 1;
         }
@@ -127,6 +139,7 @@ class MinimalCli
         echo "  bootstrap-check   Test if Horde can bootstrap\n";
         echo "  reconfigure       Run installer to configure Horde\n";
         echo "                    (aliases: install)\n";
+        echo "  activate          Activate a configuration preset\n";
         echo "\n";
         echo "Configuration Commands:\n";
         echo "\n";
@@ -161,6 +174,19 @@ class MinimalCli
         echo "    hordectl reconfigure\n";
         echo "    hordectl reconfigure --mode symlink --webroot /horde\n";
         echo "    hordectl reconfigure --force\n";
+        echo "\n";
+        echo "Activate Command:\n";
+        echo "\n";
+        echo "  hordectl activate [preset]        Activate a configuration preset\n";
+        echo "\n";
+        echo "  Arguments:\n";
+        echo "    preset              Optional. Preset name (from presets/ dir), absolute path,\n";
+        echo "                        or omit to use default (horde/base conf.php.dist)\n";
+        echo "\n";
+        echo "  Examples:\n";
+        echo "    hordectl activate                    # Use default conf.php.dist\n";
+        echo "    hordectl activate myconfig.php       # Use presets/horde/myconfig.php\n";
+        echo "    hordectl activate /path/to/conf.php  # Use absolute path\n";
         echo "\n";
         echo "Why Minimal Mode?\n";
         echo "\n";
@@ -595,5 +621,262 @@ class MinimalCli
 
         chdir($oldDir);
         return $exitCode;
+    }
+
+    private function activateCommand(array $args): int
+    {
+        // Parse arguments
+        $preset = $args[0] ?? null;
+
+        echo "\n";
+        echo "Horde Activation\n";
+        echo "================\n";
+        echo "\n";
+
+        // Check HORDE_INSTALL_DIR is configured
+        $installDir = $this->config->get('HORDE_INSTALL_DIR');
+        if (!$installDir) {
+            fwrite(STDERR, "Error: Horde installation directory not configured.\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Please set HORDE_INSTALL_DIR first:\n");
+            fwrite(STDERR, "  hordectl config set HORDE_INSTALL_DIR /path/to/installation\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        echo "Installation Directory: $installDir\n";
+
+        // Check HORDE_BASE is configured
+        $hordeBase = $this->config->get('HORDE_BASE');
+        if (!$hordeBase) {
+            fwrite(STDERR, "\nError: Horde base directory not configured.\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Please set HORDE_BASE first:\n");
+            fwrite(STDERR, "  hordectl config set HORDE_BASE /path/to/vendor/horde/horde\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        echo "Horde Base: $hordeBase\n";
+        echo "\n";
+
+        // Determine source file
+        $sourceFile = $this->resolvePresetPath($preset, $installDir, $hordeBase);
+        if (!$sourceFile) {
+            return 1;
+        }
+
+        echo "Preset: $sourceFile\n";
+
+        // Validate source file exists and is readable
+        if (!file_exists($sourceFile)) {
+            fwrite(STDERR, "\nError: Preset file not found: $sourceFile\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        if (!is_readable($sourceFile)) {
+            fwrite(STDERR, "\nError: Preset file not readable: $sourceFile\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        echo "  ✓ Preset file found and readable\n";
+
+        // Determine target directory
+        $targetDir = $installDir . '/var/config/horde';
+        $targetFile = $targetDir . '/conf.php';
+
+        echo "\n";
+        echo "Target: $targetFile\n";
+
+        // Check if target directory exists
+        if (!is_dir($targetDir)) {
+            echo "  • Creating target directory...\n";
+            if (!mkdir($targetDir, 0755, true)) {
+                fwrite(STDERR, "\nError: Failed to create directory: $targetDir\n");
+                fwrite(STDERR, "Check permissions.\n");
+                fwrite(STDERR, "\n");
+                return 1;
+            }
+            echo "  ✓ Directory created\n";
+        } else {
+            echo "  ✓ Target directory exists\n";
+        }
+
+        // Check if target file exists (warn before overwriting)
+        if (file_exists($targetFile)) {
+            echo "\n";
+            echo "Warning: Target file already exists: $targetFile\n";
+            echo "This will overwrite the existing configuration.\n";
+            echo "\n";
+            echo "Press Enter to continue, or Ctrl+C to cancel...\n";
+            fgets(STDIN);
+        }
+
+        // Copy the file
+        echo "\n";
+        echo "Copying preset to target...\n";
+        if (!copy($sourceFile, $targetFile)) {
+            fwrite(STDERR, "\nError: Failed to copy file\n");
+            fwrite(STDERR, "Source: $sourceFile\n");
+            fwrite(STDERR, "Target: $targetFile\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        echo "  ✓ Configuration file copied\n";
+
+        // Run reconfigure
+        echo "\n";
+        echo "Running reconfiguration...\n";
+        echo str_repeat('-', 60) . "\n";
+        echo "\n";
+
+        $reconfigureExit = $this->reconfigureCommand([]);
+
+        echo "\n";
+        echo str_repeat('-', 60) . "\n";
+        echo "\n";
+
+        if ($reconfigureExit === 0) {
+            echo "✓ Horde activated successfully!\n";
+            echo "\n";
+            echo "Next steps:\n";
+            echo "  • Review configuration: $targetFile\n";
+            echo "  • Update database settings if needed\n";
+            echo "  • Visit your Horde installation in a browser\n";
+            echo "  • Complete web-based configuration if needed\n";
+            echo "\n";
+        } else {
+            fwrite(STDERR, "✗ Activation completed but reconfigure failed\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Configuration file was copied but reconfiguration failed.\n");
+            fwrite(STDERR, "You may need to run 'hordectl reconfigure' manually.\n");
+            fwrite(STDERR, "\n");
+        }
+
+        return $reconfigureExit;
+    }
+
+    private function resolvePresetPath(?string $preset, string $installDir, string $hordeBase): ?string
+    {
+        // No argument - use default conf.php.dist
+        if ($preset === null || $preset === '') {
+            return $hordeBase . '/config/conf.php.dist';
+        }
+
+        // Absolute path
+        if ($preset[0] === '/') {
+            return $preset;
+        }
+
+        // Relative path - check presets/horde directory
+        $presetPath = $installDir . '/presets/horde/' . $preset;
+        if (file_exists($presetPath)) {
+            return $presetPath;
+        }
+
+        // Also try without the filename - maybe they gave just a name
+        if (!str_ends_with($preset, '.php')) {
+            $presetPath = $installDir . '/presets/horde/' . $preset . '.php';
+            if (file_exists($presetPath)) {
+                return $presetPath;
+            }
+        }
+
+        fwrite(STDERR, "\nError: Preset not found\n");
+        fwrite(STDERR, "\n");
+        fwrite(STDERR, "Searched for:\n");
+        fwrite(STDERR, "  • $installDir/presets/horde/$preset\n");
+        if (!str_ends_with($preset, '.php')) {
+            fwrite(STDERR, "  • $installDir/presets/horde/$preset.php\n");
+        }
+        fwrite(STDERR, "\n");
+        fwrite(STDERR, "Available presets:\n");
+
+        // List available presets
+        $presetsDir = $installDir . '/presets/horde';
+        if (is_dir($presetsDir)) {
+            $presets = glob($presetsDir . '/*.php');
+            if (empty($presets)) {
+                fwrite(STDERR, "  (none - directory is empty)\n");
+            } else {
+                foreach ($presets as $availablePreset) {
+                    fwrite(STDERR, "  • " . basename($availablePreset) . "\n");
+                }
+            }
+        } else {
+            fwrite(STDERR, "  (presets directory does not exist: $presetsDir)\n");
+        }
+
+        fwrite(STDERR, "\n");
+        fwrite(STDERR, "You can also provide an absolute path to a conf.php file.\n");
+        fwrite(STDERR, "\n");
+
+        return null;
+    }
+
+    private function showActivateHelp(): void
+    {
+        echo "\n";
+        echo "Hordectl Activate Command\n";
+        echo "=========================\n";
+        echo "\n";
+        echo "Usage: hordectl activate [preset]\n";
+        echo "\n";
+        echo "Activates a Horde configuration by copying a preset conf.php file to\n";
+        echo "var/config/horde/conf.php and running the installer to reconfigure.\n";
+        echo "\n";
+        echo "Arguments:\n";
+        echo "\n";
+        echo "  preset              Configuration preset (optional)\n";
+        echo "                      • Omit to use default (horde/base conf.php.dist)\n";
+        echo "                      • Filename from presets/horde/ directory\n";
+        echo "                      • Absolute path to a conf.php file\n";
+        echo "\n";
+        echo "Preset Resolution:\n";
+        echo "\n";
+        echo "  1. No argument        → Use vendor/horde/horde/config/conf.php.dist\n";
+        echo "  2. Absolute path      → Use that file directly\n";
+        echo "  3. Filename           → Look in \$INSTALL_DIR/presets/horde/\n";
+        echo "\n";
+        echo "Examples:\n";
+        echo "\n";
+        echo "  # Use default configuration template\n";
+        echo "  hordectl activate\n";
+        echo "\n";
+        echo "  # Use a preset from presets/horde/ directory\n";
+        echo "  hordectl activate production.php\n";
+        echo "  hordectl activate dev-sqlite.php\n";
+        echo "\n";
+        echo "  # Use an absolute path\n";
+        echo "  hordectl activate /etc/horde/conf.php\n";
+        echo "\n";
+        echo "What it does:\n";
+        echo "\n";
+        echo "  1. Validates HORDE_INSTALL_DIR and HORDE_BASE are configured\n";
+        echo "  2. Resolves the preset path (default, presets dir, or absolute)\n";
+        echo "  3. Creates var/config/horde/ directory if needed\n";
+        echo "  4. Copies preset file to var/config/horde/conf.php\n";
+        echo "  5. Runs 'composer horde:reconfigure' to set up the installation\n";
+        echo "\n";
+        echo "Creating Presets:\n";
+        echo "\n";
+        echo "  Create custom configuration presets in:\n";
+        echo "    \$INSTALL_DIR/presets/horde/myconfig.php\n";
+        echo "\n";
+        echo "  Example preset names:\n";
+        echo "    • production.php    - Production configuration\n";
+        echo "    • dev-sqlite.php    - Development with SQLite\n";
+        echo "    • dev-mysql.php     - Development with MySQL\n";
+        echo "    • testing.php       - Testing configuration\n";
+        echo "\n";
+        echo "Notes:\n";
+        echo "\n";
+        echo "  • Will prompt before overwriting existing conf.php\n";
+        echo "  • After activation, review the configuration and update database settings\n";
+        echo "  • You may need to complete configuration via web interface\n";
+        echo "\n";
     }
 }
