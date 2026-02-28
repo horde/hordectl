@@ -13,11 +13,35 @@ $autoloaders = [
     'Horde/Autoloader/Default.php'
 ];
 
+$autoloaderFound = false;
 foreach ($autoloaders as $autoloader) {
     if (file_exists($autoloader)) {
         require_once $autoloader;
+        $autoloaderFound = true;
         break;
     }
 }
+
+// Check if the main class is available
+if (!class_exists('\Horde\Hordectl\Cli')) {
+    fwrite(STDERR, "Error: Hordectl dependencies not installed or autoloader not configured.\n\n");
+
+    if (!$autoloaderFound) {
+        fwrite(STDERR, "No autoloader found. Please ensure one of the following exists:\n");
+        fwrite(STDERR, "  - vendor/autoload.php (run 'composer install' in hordectl directory)\n");
+        fwrite(STDERR, "  - ../../../autoload.php (if installed via composer require)\n");
+        fwrite(STDERR, "  - Horde/Autoloader/Default.php (if using PEAR-style installation)\n\n");
+    } else {
+        fwrite(STDERR, "Autoloader found but Hordectl classes not available.\n");
+        fwrite(STDERR, "Please run 'composer install' in the hordectl directory to install dependencies.\n\n");
+    }
+
+    fwrite(STDERR, "Installation instructions:\n");
+    fwrite(STDERR, "  1. cd " . dirname(__DIR__) . "\n");
+    fwrite(STDERR, "  2. composer install\n\n");
+    fwrite(STDERR, "For more information, see: README.md\n");
+    exit(1);
+}
+
 $parameters = ['argv' => $GLOBALS['argv']];
 \Horde\Hordectl\Cli::main($parameters);
