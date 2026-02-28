@@ -12,6 +12,10 @@ class Help
 implements Module, ModuleUsage
 {
     use ModuleTrait;
+
+    protected \Horde_Cli $cli;
+    protected \Horde_Argv_Parser $parser;
+
     public function __construct(\Horde_Injector $dependencies)
     {
         $this->dependencies = $dependencies;
@@ -49,13 +53,17 @@ implements Module, ModuleUsage
                         $status
                     )
                 );
-                foreach ($this->dependencies->getApplicationResources($app) as $resource) {
-                    if ($resource) {
-                        $this->cli->writeln('Has Resources');
+                $resources = $this->dependencies->getApplicationResources($app);
+                if ($resources) {
+                    foreach ($resources as $resource) {
+                        if ($resource) {
+                            $this->cli->writeln('Has Resources');
+                        }
                     }
                 }
             }
+            return true;
         }
-        return true;
+        return false;
     }
 }

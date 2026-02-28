@@ -11,6 +11,8 @@ class App
 implements Module, ModuleUsage
 {
     use ModuleTrait;
+
+    protected \Horde_Cli $cli;
     public function __construct(\Horde_Injector $dependencies)
     {
         $this->dependencies = $dependencies;

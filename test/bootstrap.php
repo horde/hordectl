@@ -1,5 +1,5 @@
 <?php
-use Horde\Test\Bootstrap;
+
 $candidates = [
     dirname(__FILE__, 2) . '/vendor/autoload.php',
     dirname(__FILE__, 4) . '/autoload.php',
@@ -10,7 +10,4 @@ foreach ($candidates as $candidate) {
         require_once $candidate;
         break;
     }
-}
-if (class_exists(Bootstrap::class)) {
-    Bootstrap::bootstrap(dirname(__FILE__));
 }

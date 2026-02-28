@@ -5,7 +5,9 @@ namespace Horde\Hordectl\Test;
 use Horde\Hordectl\YamlWriter;
 use Horde\Yaml\Dumper;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
+#[AllowMockObjectsWithoutExpectations]
 class YamlWriterTest extends TestCase
 {
     public function testNewYamlWriter()
