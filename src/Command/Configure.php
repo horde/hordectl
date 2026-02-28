@@ -139,6 +139,11 @@ class Configure implements Module, ModuleUsage
             'mailer' => 'Configure mail transport settings',
             'prefs' => 'Configure preferences backend',
             'cache' => 'Configure caching backend',
+            'sessionhandler' => 'Configure session handler and storage',
+            'ldap' => 'Configure LDAP connection and settings',
+            'groups' => 'Configure groups backend and management',
+            'permissions' => 'Configure permissions system',
+            'tokens' => 'Configure authentication tokens',
         ];
 
         return $descriptions[$name] ?? '';
