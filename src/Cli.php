@@ -60,6 +60,20 @@ class Cli implements Module
         } catch (HordeNotFoundException $e) {
             $cli->writeln("Error: Horde installation not found. Please set the HORDE_GIT_DIR or HORDE_BASE environment variables.");
             return false;
+        } catch (HordeBootstrapException $e) {
+            // Bootstrap failed - fall back to minimal CLI
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Warning: Horde bootstrap failed\n");
+            fwrite(STDERR, "Error: " . $e->getMessage() . "\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Running in minimal mode with limited commands.\n");
+            fwrite(STDERR, "Use 'hordectl help' to see available commands.\n");
+            fwrite(STDERR, "\n");
+
+            // Load config and run minimal CLI
+            $config = new ConfigManager();
+            $minimalCli = new MinimalCli($config);
+            return $minimalCli->run($parameters['argv']);
         }
 
         // TODO: How to handle uninitialized horde? Not all commands may need a working horde

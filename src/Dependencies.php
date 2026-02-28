@@ -30,19 +30,26 @@ class Dependencies extends Injector
 
     /**
      * Perform bootstrap of the horde base app
-     * 
-     * TODO: Handle cases of incomplete config
+     *
+     * @throws HordeBootstrapException if bootstrap fails
      */
     public function bootstrapHorde()
     {
         if (!$this->hordeBootstrapped) {
-            require_once $this->findHordePath() . '/lib/Application.php';
-            $app = \Horde_Registry::appInit('horde', ['cli' => true]);
-            $this->setInstance('HordeApplication', $app);
-            $this->setInstance('HordeInjector', $GLOBALS['injector']);
-            $this->setInstance('HordeConfig', $GLOBALS['conf']);
-            $this->setInstance('HordeRegistry', $GLOBALS['registry']);
-            $this->setInstance('HordePrefs', $GLOBALS['prefs']);
+            try {
+                require_once $this->findHordePath() . '/lib/Application.php';
+                $app = \Horde_Registry::appInit('horde', ['cli' => true]);
+                $this->setInstance('HordeApplication', $app);
+                $this->setInstance('HordeInjector', $GLOBALS['injector']);
+                $this->setInstance('HordeConfig', $GLOBALS['conf']);
+                $this->setInstance('HordeRegistry', $GLOBALS['registry']);
+                $this->setInstance('HordePrefs', $GLOBALS['prefs']);
+            } catch (\Throwable $e) {
+                throw new HordeBootstrapException(
+                    'Horde bootstrap failed: ' . $e->getMessage(),
+                    $e
+                );
+            }
         }
         $this->hordeBootstrapped = true;
     }
