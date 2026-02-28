@@ -5,6 +5,7 @@ use \Horde_Cli_Modular_Module as Module;
 use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
+use Horde\Argv\Parser;
 /**
  *
  * Import command module for Horde users
@@ -19,7 +20,7 @@ implements Module, ModuleUsage
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
     }

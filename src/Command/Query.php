@@ -6,6 +6,7 @@ use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use \Horde\Hordectl\HasModulesTrait;
 use Horde\Injector\Injector;
+use Horde\Argv\Parser;
 /**
  *
  * Query command module implements CLI Query Yaml output
@@ -22,7 +23,7 @@ implements Module, ModuleUsage
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->_parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
         $this->_initModules(

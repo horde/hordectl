@@ -39,7 +39,7 @@ class Cli implements Module
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->_parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
         $prefix = '\Horde\Hordectl\Command';
@@ -78,7 +78,7 @@ class Cli implements Module
 
         // TODO: How to handle uninitialized horde? Not all commands may need a working horde
         // Setup the CLI Parser.
-        $parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $parser = $dependencies->getInstance(Parser::class);
         $parser->allowInterspersedArgs = false;
         // Setup the modules system
         $modular = self::_prepareModular($dependencies);

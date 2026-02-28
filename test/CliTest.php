@@ -35,7 +35,7 @@ class CliTest extends TestCase
                 if ($class === '\Horde_Cli') {
                     return $this->mockCli;
                 }
-                if ($class === '\Horde_Argv_Parser') {
+                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
                     return $this->mockParser;
                 }
                 // Return a simple stub for Command classes
@@ -68,7 +68,7 @@ class CliTest extends TestCase
             ->with($this->logicalOr(
                 $this->equalTo('\Horde_Cli'),
                 $this->stringStartsWith('\Horde\Hordectl\Command\\'),
-                $this->equalTo('\Horde_Argv_Parser')
+                $this->equalTo(Parser::class)
             ));
 
         new Cli($this->mockInjector);
@@ -79,7 +79,7 @@ class CliTest extends TestCase
         $this->mockInjector->expects($this->atLeastOnce())
             ->method('getInstance')
             ->with($this->logicalOr(
-                $this->equalTo('\Horde_Argv_Parser'),
+                $this->equalTo(Parser::class),
                 $this->stringStartsWith('\Horde\Hordectl\Command\\'),
                 $this->equalTo('\Horde_Cli')
             ));

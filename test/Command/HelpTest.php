@@ -36,7 +36,7 @@ class HelpTest extends TestCase
                 if ($class === '\Horde_Cli') {
                     return $this->mockCli;
                 }
-                if ($class === '\Horde_Argv_Parser') {
+                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
                     return $this->mockParser;
                 }
                 // For HordeRegistry and other classes, return null by default
@@ -57,7 +57,7 @@ class HelpTest extends TestCase
             ->method('getInstance')
             ->with($this->logicalOr(
                 $this->equalTo('\Horde_Cli'),
-                $this->equalTo('\Horde_Argv_Parser')
+                $this->equalTo(Parser::class)
             ));
 
         new Help($this->mockInjector);
@@ -68,7 +68,7 @@ class HelpTest extends TestCase
         $this->mockInjector->expects($this->atLeastOnce())
             ->method('getInstance')
             ->with($this->logicalOr(
-                $this->equalTo('\Horde_Argv_Parser'),
+                $this->equalTo(Parser::class),
                 $this->equalTo('\Horde_Cli')
             ));
 
@@ -97,7 +97,7 @@ class HelpTest extends TestCase
                 if ($class === '\Horde_Cli') {
                     return $this->mockCli;
                 }
-                if ($class === '\Horde_Argv_Parser') {
+                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
                     return $this->mockParser;
                 }
                 if ($class === 'HordeRegistry') {
@@ -140,7 +140,7 @@ class HelpTest extends TestCase
                 if ($class === '\Horde_Cli') {
                     return $this->mockCli;
                 }
-                if ($class === '\Horde_Argv_Parser') {
+                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
                     return $this->mockParser;
                 }
                 if ($class === 'HordeRegistry') {
@@ -190,7 +190,7 @@ class HelpTest extends TestCase
                 if ($class === '\Horde_Cli') {
                     return $mockCli;
                 }
-                if ($class === '\Horde_Argv_Parser') {
+                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
                     return $mockParser;
                 }
                 if ($class === 'HordeRegistry') {

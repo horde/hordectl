@@ -26,7 +26,7 @@ class Import implements Module, ModuleUsage
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->_parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         //        $this->_parser->allowInterspersedArgs = false;
         $this->_initModules(
