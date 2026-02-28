@@ -155,6 +155,7 @@ class Cli implements Module
             'query' => 'Query and export Horde resources as YAML',
             'import' => 'Import resources into Horde from YAML',
             'patch' => 'Modify individual Horde resources',
+            'configure' => 'Configure Horde subsystems and settings',
         ];
 
         return $descriptions[$name] ?? '';
