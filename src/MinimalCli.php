@@ -51,7 +51,18 @@ class MinimalCli
         // Remove script name
         array_shift($argv);
 
-        // Parse options
+        // Check for reconfigure command early (before parser tries to parse its options)
+        if (count($argv) >= 1 && ($argv[0] === 'reconfigure' || $argv[0] === 'install')) {
+            // Handle reconfigure --help specially
+            if (count($argv) >= 2 && ($argv[1] === '--help' || $argv[1] === '-h')) {
+                $this->showReconfigureHelp();
+                return 0;
+            }
+            // Pass all args to reconfigure command (it handles its own options)
+            return $this->reconfigureCommand(array_slice($argv, 1));
+        }
+
+        // Parse options for other commands
         list($options, $args) = $this->parser->parseArgs($argv);
 
         // Handle --version
@@ -85,6 +96,7 @@ class MinimalCli
                 fwrite(STDERR, "  config            Show or edit configuration\n");
                 fwrite(STDERR, "  status            Check installation status\n");
                 fwrite(STDERR, "  bootstrap-check   Test if Horde can bootstrap\n");
+                fwrite(STDERR, "  reconfigure       Run installer to configure Horde\n");
                 fwrite(STDERR, "\n");
                 return 1;
         }
@@ -113,6 +125,8 @@ class MinimalCli
         echo "  config            Show or edit hordectl configuration\n";
         echo "  status            Check Horde installation status\n";
         echo "  bootstrap-check   Test if Horde can bootstrap\n";
+        echo "  reconfigure       Run installer to configure Horde\n";
+        echo "                    (aliases: install)\n";
         echo "\n";
         echo "Configuration Commands:\n";
         echo "\n";
@@ -132,6 +146,21 @@ class MinimalCli
         echo "\n";
         echo "  # Check installation status\n";
         echo "  hordectl status\n";
+        echo "\n";
+        echo "Reconfigure Command:\n";
+        echo "\n";
+        echo "  hordectl reconfigure [options]    Run Horde installer plugin to configure installation\n";
+        echo "\n";
+        echo "  Options:\n";
+        echo "    --mode <mode>       Installation mode: symlink, proxy, copy (default: proxy)\n";
+        echo "    --webroot <path>    Web root path (default: /)\n";
+        echo "    --force             Delete and rewrite normally untouched files\n";
+        echo "    --help              Show reconfigure help\n";
+        echo "\n";
+        echo "  Examples:\n";
+        echo "    hordectl reconfigure\n";
+        echo "    hordectl reconfigure --mode symlink --webroot /horde\n";
+        echo "    hordectl reconfigure --force\n";
         echo "\n";
         echo "Why Minimal Mode?\n";
         echo "\n";
@@ -367,5 +396,204 @@ class MinimalCli
             echo "\n";
             return 1;
         }
+    }
+
+    private function reconfigureCommand(array $args): int
+    {
+        // Parse arguments
+        $options = [
+            'mode' => null,
+            'webroot' => null,
+            'force' => false,
+            'help' => false,
+        ];
+
+        for ($i = 0; $i < count($args); $i++) {
+            switch ($args[$i]) {
+                case '--help':
+                case '-h':
+                    $options['help'] = true;
+                    break;
+                case '--mode':
+                    if (!isset($args[$i + 1])) {
+                        fwrite(STDERR, "Error: --mode requires a value\n");
+                        return 1;
+                    }
+                    $options['mode'] = $args[++$i];
+                    break;
+                case '--webroot':
+                    if (!isset($args[$i + 1])) {
+                        fwrite(STDERR, "Error: --webroot requires a value\n");
+                        return 1;
+                    }
+                    $options['webroot'] = $args[++$i];
+                    break;
+                case '--force':
+                    $options['force'] = true;
+                    break;
+                default:
+                    fwrite(STDERR, "Error: Unknown option '{$args[$i]}'\n");
+                    fwrite(STDERR, "Use --help to see available options\n");
+                    return 1;
+            }
+        }
+
+        // Show help if requested
+        if ($options['help']) {
+            $this->showReconfigureHelp();
+            return 0;
+        }
+
+        echo "\n";
+        echo "Horde Reconfiguration\n";
+        echo "=====================\n";
+        echo "\n";
+
+        // Check HORDE_INSTALL_DIR is configured
+        $installDir = $this->config->get('HORDE_INSTALL_DIR');
+        if (!$installDir) {
+            fwrite(STDERR, "Error: Horde installation directory not configured.\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Please set HORDE_INSTALL_DIR first:\n");
+            fwrite(STDERR, "  hordectl config set HORDE_INSTALL_DIR /path/to/installation\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        echo "Installation Directory: $installDir\n";
+
+        // Validate composer.json exists
+        if (!file_exists($installDir . '/composer.json')) {
+            fwrite(STDERR, "\nError: composer.json not found in $installDir\n");
+            fwrite(STDERR, "This does not appear to be a valid Horde installation.\n");
+            return 1;
+        }
+
+        echo "  ✓ composer.json found\n";
+
+        // Detect composer binary
+        $composerHelper = new ComposerHelper();
+        try {
+            $composerBin = $composerHelper->detectComposerBin();
+            echo "  ✓ Composer found: $composerBin\n";
+        } catch (\RuntimeException $e) {
+            fwrite(STDERR, "\nError: " . $e->getMessage() . "\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Install composer from https://getcomposer.org/\n");
+            fwrite(STDERR, "\n");
+            return 1;
+        }
+
+        // Build composer command
+        $command = escapeshellarg($composerBin) . ' horde:reconfigure';
+
+        if ($options['mode']) {
+            $command .= ' --mode ' . escapeshellarg($options['mode']);
+        }
+
+        if ($options['webroot']) {
+            $command .= ' --webroot ' . escapeshellarg($options['webroot']);
+        }
+
+        if ($options['force']) {
+            $command .= ' --force';
+        }
+
+        echo "\n";
+        echo "Running: $command\n";
+        echo "Working directory: $installDir\n";
+        echo "\n";
+        echo str_repeat('-', 60) . "\n";
+        echo "\n";
+
+        // Execute command
+        $exitCode = $this->executeCommand($command, $installDir);
+
+        echo "\n";
+        echo str_repeat('-', 60) . "\n";
+        echo "\n";
+
+        if ($exitCode === 0) {
+            echo "✓ Reconfiguration completed successfully\n";
+            echo "\n";
+            echo "Next steps:\n";
+            echo "  • Run 'hordectl status' to check installation\n";
+            echo "  • Visit your Horde installation in a browser\n";
+            echo "  • Complete web-based configuration if needed\n";
+            echo "\n";
+        } else {
+            fwrite(STDERR, "✗ Reconfiguration failed with exit code $exitCode\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Common issues:\n");
+            fwrite(STDERR, "  • horde-installer-plugin not installed\n");
+            fwrite(STDERR, "    Run: cd $installDir && composer require horde/horde-installer-plugin\n");
+            fwrite(STDERR, "  • Permission issues (check file/directory permissions)\n");
+            fwrite(STDERR, "  • Invalid installation directory\n");
+            fwrite(STDERR, "\n");
+        }
+
+        return $exitCode;
+    }
+
+    private function showReconfigureHelp(): void
+    {
+        echo "\n";
+        echo "Hordectl Reconfigure Command\n";
+        echo "============================\n";
+        echo "\n";
+        echo "Usage: hordectl reconfigure [options]\n";
+        echo "\n";
+        echo "Runs the Horde installer plugin to configure your installation.\n";
+        echo "This creates web/, var/config/, and other necessary directories and files.\n";
+        echo "\n";
+        echo "Options:\n";
+        echo "\n";
+        echo "  --mode <mode>       Installation mode (default: proxy)\n";
+        echo "                      • symlink - Create symlinks to vendor packages\n";
+        echo "                      • proxy   - Create proxy PHP files (recommended)\n";
+        echo "                      • copy    - Copy files from vendor packages\n";
+        echo "\n";
+        echo "  --webroot <path>    Web root path (default: /)\n";
+        echo "                      The URL path where Horde is accessible\n";
+        echo "                      Examples: /, /horde, /mail\n";
+        echo "\n";
+        echo "  --force             Delete and rewrite normally untouched files\n";
+        echo "                      Use with caution - overwrites existing config\n";
+        echo "\n";
+        echo "  --help              Show this help message\n";
+        echo "\n";
+        echo "Examples:\n";
+        echo "\n";
+        echo "  # Basic reconfiguration (proxy mode, webroot /)\n";
+        echo "  hordectl reconfigure\n";
+        echo "\n";
+        echo "  # Use symlink mode for development\n";
+        echo "  hordectl reconfigure --mode symlink\n";
+        echo "\n";
+        echo "  # Configure for /horde URL path\n";
+        echo "  hordectl reconfigure --webroot /horde\n";
+        echo "\n";
+        echo "  # Force reconfiguration (overwrites config)\n";
+        echo "  hordectl reconfigure --force\n";
+        echo "\n";
+        echo "Prerequisites:\n";
+        echo "\n";
+        echo "  • HORDE_INSTALL_DIR must be configured\n";
+        echo "    (use 'hordectl config set HORDE_INSTALL_DIR /path')\n";
+        echo "  • Composer must be installed\n";
+        echo "  • horde-installer-plugin must be installed\n";
+        echo "    (run 'composer require horde/horde-installer-plugin' in install dir)\n";
+        echo "\n";
+    }
+
+    private function executeCommand(string $command, string $workingDir): int
+    {
+        $oldDir = getcwd();
+        chdir($workingDir);
+
+        passthru($command, $exitCode);
+
+        chdir($oldDir);
+        return $exitCode;
     }
 }
