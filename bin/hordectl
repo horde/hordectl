@@ -4,20 +4,175 @@ if (strpos('@php_dir@', '@php_dir') === 0) {
     set_include_path(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . PATH_SEPARATOR . get_include_path());
 }
 
-// hordectl standalone run in composer setups
-$autoloaders = [
-    __DIR__ . '/../config/autoload.php', // custom autoload config
-    __DIR__ . '/../vendor/autoload.php', // hordectl is root app
-    __DIR__ . '/../../../autoload.php', // hordectl is installed in a horde-deployment
-    // handle pear cases or other cases where horde autoloader is already set up
-    'Horde/Autoloader/Default.php'
-];
+// ============================================================================
+// PHASE 1: Load ONLY hordectl's autoloader (no Horde bootstrap yet)
+// ============================================================================
 
-foreach ($autoloaders as $autoloader) {
-    if (file_exists($autoloader)) {
-        require_once $autoloader;
-        break;
+// When run via Composer bin proxy, use the bundle's autoloader
+if (isset($GLOBALS['_composer_autoload_path'])) {
+    require_once $GLOBALS['_composer_autoload_path'];
+    $autoloaderFound = true;
+} else {
+    // hordectl standalone run in composer setups
+    $autoloaders = [
+        __DIR__ . '/../config/autoload.php', // custom autoload config
+        __DIR__ . '/../vendor/autoload.php', // hordectl is root app
+        __DIR__ . '/../../../autoload.php', // hordectl is installed in a horde-deployment
+    ];
+
+    $autoloaderFound = false;
+    foreach ($autoloaders as $autoloader) {
+        if (file_exists($autoloader)) {
+            require_once $autoloader;
+            $autoloaderFound = true;
+            break;
+        }
     }
 }
+
+// Check if the main class is available
+if (!class_exists('\Horde\Hordectl\Cli')) {
+    fwrite(STDERR, "Error: Hordectl dependencies not installed or autoloader not configured.\n\n");
+
+    if (!$autoloaderFound) {
+        fwrite(STDERR, "No autoloader found. Please ensure one of the following exists:\n");
+        fwrite(STDERR, "  - vendor/autoload.php (run 'composer install' in hordectl directory)\n");
+        fwrite(STDERR, "  - ../../../autoload.php (if installed via composer require)\n\n");
+    } else {
+        fwrite(STDERR, "Autoloader found but Hordectl classes not available.\n");
+        fwrite(STDERR, "Please run 'composer install' in the hordectl directory to install dependencies.\n\n");
+    }
+
+    fwrite(STDERR, "Installation instructions:\n");
+    fwrite(STDERR, "  1. cd " . dirname(__DIR__) . "\n");
+    fwrite(STDERR, "  2. composer install\n\n");
+    fwrite(STDERR, "For more information, see: README.md\n");
+    exit(1);
+}
+
+// ============================================================================
+// PHASE 2: Initial Setup - Discover and configure Horde installation
+// ============================================================================
+// This runs with ONLY hordectl's autoloader, no Horde bootstrap
+
+try {
+    $setup = new \Horde\Hordectl\InitialSetup();
+
+    // Check if configuration is complete and valid
+    if (!$setup->ensureConfigured()) {
+        // Setup failed - no valid installation found
+        // InitialSetup already printed helpful error message
+        exit(1);
+    }
+
+    // Check if this was the first run or config was updated
+    if ($setup->needsConfiguration()) {
+        // Configuration was just created/updated
+        // InitialSetup already printed success message
+        // Exit so user can review and re-run
+        exit(0);
+    }
+
+    // Check for autoloader conflicts before attempting bootstrap
+    $hordeBase = $setup->getHordeBase();
+
+    // Determine which autoloader we're actually using
+    $usingBundleAutoloader = isset($GLOBALS['_composer_autoload_path']);
+
+    if (!$usingBundleAutoloader) {
+        // We loaded hordectl's own vendor - check for conflicts
+        $hordectlRoot = dirname(__DIR__);
+        $hordectlVendor = realpath($hordectlRoot . '/vendor');
+        $targetVendor = $hordeBase ? realpath(dirname($hordeBase, 2)) : null;
+
+        if ($hordectlVendor && $targetVendor && $hordectlVendor !== $targetVendor) {
+            // Autoloader conflict detected
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Error: Autoloader conflict detected!\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "hordectl is running from: $hordectlRoot\n");
+            fwrite(STDERR, "Target Horde is at: $hordeBase\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "These use different autoloaders which cannot be loaded together.\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "To fix this, run hordectl from the target installation:\n");
+
+            $installDir = dirname($hordeBase, 3); // Up from vendor/horde/horde to root
+            fwrite(STDERR, "  cd $installDir\n");
+            fwrite(STDERR, "  ./vendor/bin/hordectl\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Or set HORDE_BASE to point to the same installation as hordectl:\n");
+            fwrite(STDERR, "  unset HORDE_BASE\n");
+            fwrite(STDERR, "  hordectl\n");
+            fwrite(STDERR, "\n");
+            exit(1);
+        }
+    }
+
+    // Configuration is valid and no conflicts - proceed to bootstrap
+
+} catch (\Exception $e) {
+    fwrite(STDERR, "\nError during initial setup: " . $e->getMessage() . "\n");
+    fwrite(STDERR, "Stack trace:\n" . $e->getTraceAsString() . "\n\n");
+    exit(1);
+}
+
+// ============================================================================
+// PHASE 3: Bootstrap Horde and run CLI (traditional path)
+// ============================================================================
+// Now we can safely bootstrap Horde since we know where it is
+
+// Test if Horde can bootstrap before setting up error handlers
+$hordeBase = $setup->getHordeBase();
+
+// Quick bootstrap test
+$canBootstrap = false;
+$bootstrapError = null;
+
+try {
+    // Temporarily disable error reporting to catch bootstrap issues cleanly
+    $oldErrorReporting = error_reporting(0);
+    $oldErrorHandler = set_error_handler(function($errno, $errstr, $errfile, $errline) use (&$bootstrapError) {
+        $bootstrapError = "$errstr in $errfile on line $errline";
+        return true; // Suppress the error
+    });
+
+    require_once $hordeBase . '/lib/Application.php';
+
+    // Quick test of registry without full initialization
+    $testRegistry = new \Horde_Registry();
+
+    $canBootstrap = true;
+
+    // Restore error handling
+    restore_error_handler();
+    error_reporting($oldErrorReporting);
+
+} catch (\Throwable $e) {
+    $bootstrapError = $e->getMessage();
+    if ($oldErrorHandler !== null) {
+        restore_error_handler();
+    }
+    error_reporting($oldErrorReporting ?? E_ALL);
+}
+
+// If bootstrap test failed, run minimal CLI
+if (!$canBootstrap) {
+    fwrite(STDERR, "\n");
+    fwrite(STDERR, "Warning: Horde bootstrap test failed\n");
+    if ($bootstrapError) {
+        fwrite(STDERR, "Error: $bootstrapError\n");
+    }
+    fwrite(STDERR, "\n");
+    fwrite(STDERR, "Running in minimal mode with limited commands.\n");
+    fwrite(STDERR, "Use 'hordectl help' to see available commands.\n");
+    fwrite(STDERR, "\n");
+
+    $config = new \Horde\Hordectl\ConfigManager();
+    $minimalCli = new \Horde\Hordectl\MinimalCli($config);
+    exit($minimalCli->run($GLOBALS['argv']));
+}
+
+// Bootstrap test passed - proceed with full CLI
 $parameters = ['argv' => $GLOBALS['argv']];
 \Horde\Hordectl\Cli::main($parameters);

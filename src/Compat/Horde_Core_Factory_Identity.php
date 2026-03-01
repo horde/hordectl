@@ -13,6 +13,7 @@
 namespace Horde\Hordectl\Compat;
 use \Horde_String;
 use \Horde;
+use Horde\Exception\HordeException;
 
 /**
  * A Horde_Injector based Horde_Identity factory.
@@ -39,7 +40,7 @@ class Horde_Core_Factory_Identity extends \Horde_Core_Factory_Base
      *                        driver) or an application name.
      *
      * @return Horde_Identity  The singleton identity instance.
-     * @throws Horde_Exception
+     * @throws HordeException
      */
     public function create($user = null, $driver = null)
     {
@@ -62,7 +63,7 @@ class Horde_Core_Factory_Identity extends \Horde_Core_Factory_Base
             if (!is_null($driver)) {
                 $class = \Horde_String::ucfirst($driver) . '_Prefs_Identity';
                 if (!class_exists($class)) {
-                    throw new \Horde_Exception($driver . ' identity driver does not exist.');
+                    throw new HordeException($driver . ' identity driver does not exist.');
                 }
             }
             break;

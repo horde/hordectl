@@ -5,6 +5,8 @@ use \Horde\Hordectl\Resource\GroupResource;
 use \Horde_Cli_Modular_Module as Module;
 use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Injector\Injector;
+use Horde\Argv\Parser;
 /**
  *
  * Query command module for Horde Group
@@ -13,11 +15,13 @@ class Group
 implements Module, ModuleUsage
 {
     use ModuleTrait;
-    public function __construct(\Horde_Injector $dependencies)
+
+    protected \Horde_Cli $cli;
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
     }

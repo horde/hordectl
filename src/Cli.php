@@ -4,12 +4,13 @@
  */
 
 namespace Horde\Hordectl;
-use \Horde_Injector as Injector;
-use \Horde_Injector_TopLevel as TopLevelInjector;
+use Horde\Injector\Injector;
+use Horde\Injector\TopLevel;
+use Horde\Exception\HordeException;
+use Horde\Argv\IndentedHelpFormatter;
+use Horde\Argv\Parser;
 use \Horde_Cli_Modular as Cli_Modular;
 use \Horde_Cli_Modular_Module as Module;
-use \Horde_Argv_IndentedHelpFormatter as IndentedHelpFormatter;
-use \Horde_Argv_Parser as Parser;
 use Horde_Cli;
 
 /**
@@ -34,11 +35,11 @@ class Cli implements Module
 
     protected Horde_Cli|Modular $cli;
 
-    public function __construct(\Horde_Injector $dependencies)
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->_parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
         $prefix = '\Horde\Hordectl\Command';
@@ -53,17 +54,31 @@ class Cli implements Module
         // Use plain Horde Injector as long as we have no need to wrap it into something more specific
         $cli = new \Horde_Cli(array('pager' => true));
         try {
-            $dependencies = new Dependencies(new TopLevelInjector);
+            $dependencies = new Dependencies(new TopLevel);
             $dependencies->setInstance('\Horde_Cli', $cli);
             $dependencies->bootstrapHorde();
         } catch (HordeNotFoundException $e) {
             $cli->writeln("Error: Horde installation not found. Please set the HORDE_GIT_DIR or HORDE_BASE environment variables.");
             return false;
+        } catch (HordeBootstrapException $e) {
+            // Bootstrap failed - fall back to minimal CLI
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Warning: Horde bootstrap failed\n");
+            fwrite(STDERR, "Error: " . $e->getMessage() . "\n");
+            fwrite(STDERR, "\n");
+            fwrite(STDERR, "Running in minimal mode with limited commands.\n");
+            fwrite(STDERR, "Use 'hordectl help' to see available commands.\n");
+            fwrite(STDERR, "\n");
+
+            // Load config and run minimal CLI
+            $config = new ConfigManager();
+            $minimalCli = new MinimalCli($config);
+            return $minimalCli->run($parameters['argv']);
         }
 
         // TODO: How to handle uninitialized horde? Not all commands may need a working horde
         // Setup the CLI Parser.
-        $parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $parser = $dependencies->getInstance(Parser::class);
         $parser->allowInterspersedArgs = false;
         // Setup the modules system
         $modular = self::_prepareModular($dependencies);
@@ -94,23 +109,63 @@ class Cli implements Module
             foreach ($this->listModules() as $class => $module) {
                 $ran |= $module->handle($argv);
             }
-        } catch (\Horde_Exception $e) {
+        } catch (HordeException $e) {
             return false;
         }
 
         // Something didn't work as expected.
         if (!$ran) {
-            // TODO: Get more useful help
-            $this->cli->message('No Module ran', 'cli.error');
+            $this->showUsage();
         }
         return $ran;
+    }
+
+    /**
+     * Show usage information when no module handles the command
+     */
+    protected function showUsage(): void
+    {
+        $this->cli->writeln();
+        $this->cli->writeln('Usage: hordectl [OPTIONS] COMMAND [ARGUMENTS]');
+        $this->cli->writeln();
+        $this->cli->writeln('Available commands:');
+
+        foreach ($this->listModules() as $class => $module) {
+            // Get module name - extract from class name if getTitle() not available
+            if (method_exists($module, 'getTitle')) {
+                $name = strtolower($module->getTitle());
+            } else {
+                $name = strtolower(basename(str_replace('\\', '/', $class)));
+            }
+            $this->cli->writeln('  ' . str_pad($name, 15) . ' ' . $this->getModuleDescription($name));
+        }
+
+        $this->cli->writeln();
+        $this->cli->writeln('Run \'hordectl help\' for more information.');
+        $this->cli->writeln();
+    }
+
+    /**
+     * Get a brief description for a module
+     */
+    protected function getModuleDescription(string $name): string
+    {
+        $descriptions = [
+            'help' => 'Show help and list available applications',
+            'query' => 'Query and export Horde resources as YAML',
+            'import' => 'Import resources into Horde from YAML',
+            'patch' => 'Modify individual Horde resources',
+            'configure' => 'Configure Horde subsystems and settings',
+        ];
+
+        return $descriptions[$name] ?? '';
     }
 
    /**
      * Prepare the modular CLI instance.
      *
      * Adapted from Horde git-tools CLI
-     * @param  \Horde_Injector $dependencies  The dependency container.
+     * @param  Injector $dependencies  The dependency container.
      *
      * @return \Horde_Cli_Modular  The modular CLI object.
      */

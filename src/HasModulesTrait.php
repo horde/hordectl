@@ -10,6 +10,7 @@
  */
 namespace Horde\Hordectl;
 use ArrayIterator;
+use Horde\Injector\Injector;
 
 trait HasModulesTrait {
 
@@ -24,7 +25,7 @@ trait HasModulesTrait {
      *
      * Initialize all modules and assign them their parent
      */
-    private function _initModules(\Horde_Injector $dependencies, string $prefix, string $directory, array $exclude = [])
+    private function _initModules(Injector $dependencies, string $prefix, string $directory, array $exclude = [])
     {
         if (empty($directory)) {
             throw new \Horde_Cli_Modular_Exception(

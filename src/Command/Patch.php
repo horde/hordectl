@@ -5,6 +5,9 @@ use \Horde_Cli_Modular_Module as Module;
 use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use \Horde\Hordectl\HasModulesTrait;
+use Horde\Injector\Injector;
+use Horde\Argv\Option;
+use Horde\Argv\Parser;
 /**
  *
  * Command module to manipulate single resource entities
@@ -13,20 +16,23 @@ class Patch
 implements Module, ModuleUsage
 {
     use ModuleTrait;
-    public function __construct(\Horde_Injector $dependencies)
+
+    protected \Horde_Cli $cli;
+
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->_parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
     }
 
     public function getBaseOptions()
     {
-        return 
+        return
             [
-                new \Horde_Argv_Option(
+                new Option(
                     '-f',
                     '--filename',
                     [
@@ -56,7 +62,7 @@ implements Module, ModuleUsage
             return false;
         }
     
-        $parser = new \Horde_Argv_Parser();
+        $parser = new Parser();
         $parser->allowInterspersedArgs = false;
 
         list($myArgs, $moduleArgs) = $this->handleCommandline($argv);

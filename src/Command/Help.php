@@ -4,6 +4,8 @@ namespace Horde\Hordectl\Command;
 use \Horde_Cli_Modular_Module as Module;
 use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Injector\Injector;
+use Horde\Argv\Parser;
 /**
  *
  * Help command module implements CLI help/usage
@@ -12,11 +14,15 @@ class Help
 implements Module, ModuleUsage
 {
     use ModuleTrait;
-    public function __construct(\Horde_Injector $dependencies)
+
+    protected \Horde_Cli $cli;
+    protected Parser $parser;
+
+    public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
         $this->cli = $dependencies->getInstance('\Horde_Cli');
-        $this->parser = $dependencies->getInstance('\Horde_Argv_Parser');
+        $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
     }
@@ -49,13 +55,17 @@ implements Module, ModuleUsage
                         $status
                     )
                 );
-                foreach ($this->dependencies->getApplicationResources($app) as $resource) {
-                    if ($resource) {
-                        $this->cli->writeln('Has Resources');
+                $resources = $this->dependencies->getApplicationResources($app);
+                if ($resources) {
+                    foreach ($resources as $resource) {
+                        if ($resource) {
+                            $this->cli->writeln('Has Resources');
+                        }
                     }
                 }
             }
+            return true;
         }
-        return true;
+        return false;
     }
 }

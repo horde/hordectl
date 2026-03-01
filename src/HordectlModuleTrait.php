@@ -4,8 +4,12 @@
  *
  */
 namespace Horde\Hordectl;
+use Horde\Injector\Injector;
+use Horde\Argv\OptionGroup;
+
 trait HordectlModuleTrait {
 
+    protected Injector $dependencies;
     private $_parentModule;
     private $_parsed;
     private $_positional;
@@ -108,7 +112,7 @@ trait HordectlModuleTrait {
                 $this->_parser->addOption($option);
         }
         if ($this->hasOptionGroup()) {
-            $group = new \Horde_Argv_OptionGroup(
+            $group = new OptionGroup(
                 $this->_parser,
                 $this->getOptionGroupTitle(),
                 $this->getOptionGroupDescription()
