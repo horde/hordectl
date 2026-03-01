@@ -47,11 +47,11 @@ class ConfigHelper
      */
     public function __construct(string $app = 'horde', ?string $installDir = null)
     {
-        // Determine config directory
+        // Determine config directory - bundle uses var/config/$app structure
         if ($installDir !== null) {
-            $this->confDir = $installDir . '/config';
+            $this->confDir = $installDir . '/var/config/' . $app;
         } elseif (($envDir = getenv('HORDE_INSTALL_DIR')) !== false && $envDir !== '') {
-            $this->confDir = $envDir . '/config';
+            $this->confDir = $envDir . '/var/config/' . $app;
         } else {
             throw new RuntimeException(
                 'Cannot determine Horde installation directory. ' .
@@ -63,6 +63,24 @@ class ConfigHelper
         $this->confFile = $this->confDir . '/conf.php';
         $this->fileExists = file_exists($this->confFile);
 
+        // Check if configuration directory exists
+        if (!is_dir($this->confDir)) {
+            throw new RuntimeException(
+                "Configuration directory does not exist: {$this->confDir}\n\n" .
+                "The Horde installation may not be activated.\n" .
+                "Run 'hordectl activate' to initialize the installation."
+            );
+        }
+
+        // Warn if conf.php doesn't exist
+        if (!$this->fileExists) {
+            throw new RuntimeException(
+                "Configuration file not found: {$this->confFile}\n\n" .
+                "The Horde installation is not activated.\n" .
+                "Run 'hordectl activate' to copy the default configuration."
+            );
+        }
+
         // Create PhpConfigFile instance with Horde markers
         $this->file = new PhpConfigFile(
             configFilePath: $this->confFile,
@@ -70,10 +88,8 @@ class ConfigHelper
             footer: '/* CONFIG END. DO NOT CHANGE ANYTHING IN OR BEFORE THIS LINE. */'
         );
 
-        // Load current configuration if file exists
-        if ($this->fileExists) {
-            $this->loadCurrentConfig();
-        }
+        // Load current configuration
+        $this->loadCurrentConfig();
     }
 
     /**

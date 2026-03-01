@@ -14,7 +14,7 @@ authors:
     active: true
     role: lead
 version:
-  release: 1.0.0-alpha5
+  release: 1.0.0-alpha6
   api: 1.0.0alpha1
 state:
   release: alpha
@@ -33,6 +33,7 @@ dependencies:
       horde/argv: ^3
       horde/yaml: ^3
       horde/group: ^3
+      horde/phpconfigfile: ^3
   dev:
     composer:
       horde/test: ^3

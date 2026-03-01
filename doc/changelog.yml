@@ -1,4 +1,35 @@
 ---
+1.0.0-alpha6:
+  api: 1.0.0-alpha1
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-01
+  license:
+    identifier: LGPL-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: |
+    refactor(configure): extract common helpers into ConfigureHelperTrait
+    feat(configure): implement Groups, Permissions, and Tokens subcommands
+    feat(configure): implement LDAP subcommand with ConfigHelper
+    feat(configure): implement SessionHandler subcommand with ConfigHelper
+    docs(examples): add database configuration demo script
+    feat(configure): implement Database subcommand with ConfigHelper
+    feat(config): add ConfigHelper class for config file manipulation
+    chore(deps): add horde/phpconfigfile dependency
+    feat(configure): add stubs for critical subsystem configuration
+    feat(configure): add configure command with database stub
+    feat(cli): show helpful usage instead of "No Module ran" error
+    fix(psr4): use PSR-4 class names for Argv\Parser instead of PEAR names
+    feat(hordectl): add activate command to copy preset config and reconfigure
+    feat(hordectl): add reconfigure command to minimal CLI
+    feat(cli): add minimal CLI fallback for incomplete Horde installations
+    refactor: migrate from PSR-0 Horde_Argv to PSR-4 Horde\Argv
+    refactor: migrate from PSR-0 Horde_Exception to PSR-4 Horde\Exception\HordeException
+    refactor: migrate from PSR-0 Horde_Injector to PSR-4 Horde\Injector\Injector
+    test: achieve 100% passing test suite with full PHPUnit 12 compatibility
+    refactor(yaml): migrate from PSR-0 to PSR-4 Horde\Yaml classes
+    feat: Give instructions on cli if not yet installed properly
 1.0.0-alpha5:
   api: 1.0.0-alpha1
   state:

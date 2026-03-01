@@ -43,7 +43,8 @@ class Configure implements Module, ModuleUsage
         $this->_initModules(
             $dependencies,
             '\Horde\Hordectl\Command\Configure',
-            dirname(__FILE__) . '/Configure'
+            dirname(__FILE__) . '/Configure',
+            ['ConfigureHelperTrait']
         );
     }
 
