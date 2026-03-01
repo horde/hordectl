@@ -51,6 +51,11 @@ class Permissions implements Module, ModuleUsage
         $this->_parser->allowInterspersedArgs = false;
     }
 
+    public function getPositionalArgs(): array
+    {
+        return ['permissions', 'perms'];
+    }
+
     public function getBaseOptions()
     {
         return [

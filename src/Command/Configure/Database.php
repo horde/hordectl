@@ -54,6 +54,11 @@ class Database implements Module, ModuleUsage
         $this->_parser->allowInterspersedArgs = false;
     }
 
+    public function getPositionalArgs(): array
+    {
+        return ['database', 'db'];
+    }
+
     public function getBaseOptions()
     {
         return [
