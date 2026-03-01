@@ -52,6 +52,11 @@ class SessionHandler implements Module, ModuleUsage
         $this->_parser->allowInterspersedArgs = false;
     }
 
+    public function getPositionalArgs(): array
+    {
+        return ['sessionhandler', 'session'];
+    }
+
     public function getBaseOptions()
     {
         return [
