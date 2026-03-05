@@ -33,7 +33,7 @@ dependencies:
       horde/argv: ^3
       horde/yaml: ^3
       horde/group: ^3
-      horde/phpconfigfile: ^3
+      horde/phpconfigfile: ^1
   dev:
     composer:
       horde/test: ^3
