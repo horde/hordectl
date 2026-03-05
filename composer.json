@@ -22,7 +22,7 @@
         "horde/argv": "^3 || dev-FRAMEWORK_6_0",
         "horde/yaml": "^3 || dev-FRAMEWORK_6_0",
         "horde/group": "^3 || dev-FRAMEWORK_6_0",
-        "horde/phpconfigfile": "^3 || dev-FRAMEWORK_6_0"
+        "horde/phpconfigfile": "^1 || dev-FRAMEWORK_6_0"
     },
     "require-dev": {
         "horde/test": "^3 || dev-FRAMEWORK_6_0",
