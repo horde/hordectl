@@ -28,7 +28,11 @@ implements Module, ModuleUsage
 
     /**
      * Decide if this module handles the commandline
-     * 
+     *
+     * Usage:
+     *   hordectl query group              - Export all groups
+     *   hordectl query group <groupname>  - Export specific group
+     *
      * @params array $globalOpts  Commandline Options already parsed by previous levels
      * @params array $argv        The arguments for the parser to digest
      */
@@ -41,12 +45,36 @@ implements Module, ModuleUsage
         if ($argv[0] != 'group') {
             return false;
         }
-        // TODO: accept some filters on which groups to export and which details to export
+
         $writer = $this->dependencies->getInstance('\Horde\Hordectl\YamlWriter');
         unset($GLOBALS['conf']);
         $exporter = $this->dependencies->getInstance('GroupRepo');
-        $items = $exporter->export();
-        $writer->addResource('builtin', 'group', $items);
+
+        // Check if a specific group name was provided
+        if (isset($argv[1]) && !empty($argv[1])) {
+            $groupname = $argv[1];
+
+            // Export all groups and filter
+            $allItems = $exporter->export();
+            $items = array_filter($allItems, function($item) use ($groupname) {
+                return isset($item['groupName']) && $item['groupName'] === $groupname;
+            });
+
+            if (empty($items)) {
+                $this->cli->message(
+                    sprintf('Group "%s" not found', $groupname),
+                    'cli.error'
+                );
+                return true;
+            }
+
+            $writer->addResource('builtin', 'group', array_values($items));
+        } else {
+            // Export all groups
+            $items = $exporter->export();
+            $writer->addResource('builtin', 'group', $items);
+        }
+
         return true;
     }
 }
