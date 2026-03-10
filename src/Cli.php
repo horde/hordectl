@@ -130,6 +130,8 @@ class Cli implements Module
         $this->cli->writeln();
         $this->cli->writeln('Available commands:');
 
+        // Build list of commands with their descriptions
+        $commands = [];
         foreach ($this->listModules() as $class => $module) {
             // Get module name - extract from class name if getTitle() not available
             if (method_exists($module, 'getTitle')) {
@@ -137,7 +139,15 @@ class Cli implements Module
             } else {
                 $name = strtolower(basename(str_replace('\\', '/', $class)));
             }
-            $this->cli->writeln('  ' . str_pad($name, 15) . ' ' . $this->getModuleDescription($name));
+            $commands[$name] = $this->getModuleDescription($name);
+        }
+
+        // Sort alphabetically by command name
+        ksort($commands);
+
+        // Display sorted commands
+        foreach ($commands as $name => $description) {
+            $this->cli->writeln('  ' . str_pad($name, 15) . ' ' . $description);
         }
 
         $this->cli->writeln();
@@ -156,6 +166,8 @@ class Cli implements Module
             'import' => 'Import resources into Horde from YAML',
             'patch' => 'Modify individual Horde resources',
             'configure' => 'Configure Horde subsystems and settings',
+            'activate' => 'Activate Horde installation by copying default configuration',
+            'test' => 'Test Horde subsystems (db, cache, session, logger, auth, jwt)',
         ];
 
         return $descriptions[$name] ?? '';
