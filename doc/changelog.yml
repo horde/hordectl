@@ -1,4 +1,15 @@
 ---
+1.0.0-alpha9:
+  api: 1.0.0-alpha9
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-13
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: |-
+    fix(cli): handle version command before Horde bootstrap
 1.0.0-alpha8:
   api: 1.0.0-alpha8
   state:
