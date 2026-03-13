@@ -1,4 +1,15 @@
 ---
+1.0.0-alpha8:
+  api: 1.0.0-alpha8
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-13
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: |-
+    feat(cli): add version command for PHAR validation
 1.0.0-alpha7:
   api: 1.0.0-alpha7
   state:
