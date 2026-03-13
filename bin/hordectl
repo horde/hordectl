@@ -30,6 +30,20 @@ if (isset($GLOBALS['_composer_autoload_path'])) {
     }
 }
 
+// Handle version command early (before Horde bootstrap) for PHAR validation
+if (isset($argv[1]) && in_array($argv[1], ['version', '--version', '-v'], true)) {
+    $composerJson = __DIR__ . '/../composer.json';
+    $version = 'unknown';
+
+    if (file_exists($composerJson)) {
+        $data = json_decode(file_get_contents($composerJson), true);
+        $version = $data['version'] ?? 'dev-main';
+    }
+
+    echo "hordectl version {$version}\n";
+    exit(0);
+}
+
 // Check if the main class is available
 if (!class_exists('\Horde\Hordectl\Cli')) {
     fwrite(STDERR, "Error: Hordectl dependencies not installed or autoloader not configured.\n\n");
