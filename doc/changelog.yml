@@ -1,4 +1,20 @@
 ---
+1.0.0-alpha7:
+  api: 1.0.0-alpha7
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-13
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: |-
+    feat: implement better help/feedback and a new test command
+    Update horde/phpconfigfile version constraint
+    fix(deps): allow PhpConfigFile ^0 for development compatibility
+    fix: Wrong version required of phpconfigfile
+    fix(configure): add getPositionalArgs() to support command aliases
+    fix(activate): add command name check to prevent auto-execution
 1.0.0-alpha6:
   api: 1.0.0-alpha1
   state:
