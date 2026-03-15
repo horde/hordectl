@@ -11,6 +11,7 @@ use Horde\Argv\Parser;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use Horde_Cli_Modular_Module;
 
 /**
  * Test the main Cli class
@@ -40,15 +41,36 @@ class CliTest extends TestCase
                 }
                 // Return a simple stub for Command classes
                 if (str_starts_with($class, '\Horde\Hordectl\Command\\')) {
-                    return new class implements \Horde_Cli_Modular_Module {
+                    return new class implements Horde_Cli_Modular_Module {
                         public function setParentModule($module) {}
-                        public function handle($argv) { return false; }
-                        public function getUsage(): string { return ''; }
-                        public function getBaseOptions() { return []; }
-                        public function hasOptionGroup() { return false; }
-                        public function getOptionGroupTitle() { return ''; }
-                        public function getOptionGroupDescription() { return ''; }
-                        public function getOptionGroupOptions($action = null) { return []; }
+                        public function handle($argv)
+                        {
+                            return false;
+                        }
+                        public function getUsage(): string
+                        {
+                            return '';
+                        }
+                        public function getBaseOptions()
+                        {
+                            return [];
+                        }
+                        public function hasOptionGroup()
+                        {
+                            return false;
+                        }
+                        public function getOptionGroupTitle()
+                        {
+                            return '';
+                        }
+                        public function getOptionGroupDescription()
+                        {
+                            return '';
+                        }
+                        public function getOptionGroupOptions($action = null)
+                        {
+                            return [];
+                        }
                     };
                 }
                 return null;

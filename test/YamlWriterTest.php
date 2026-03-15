@@ -7,6 +7,9 @@ use Horde\Yaml\Dumper;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
+/**
+ * @coversNothing
+ */
 #[AllowMockObjectsWithoutExpectations]
 class YamlWriterTest extends TestCase
 {

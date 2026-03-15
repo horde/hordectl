@@ -1,8 +1,12 @@
 <?php
+
 namespace Horde\Hordectl;
 
 use Horde\Argv\Parser;
 use Horde\Argv\IndentedHelpFormatter;
+use Horde_Registry;
+use RuntimeException;
+use Throwable;
 
 /**
  * Minimal CLI for hordectl when Horde bootstrap fails
@@ -30,7 +34,8 @@ class MinimalCli
         ]);
 
         $this->parser->addOption(
-            '-v', '--verbose',
+            '-v',
+            '--verbose',
             [
                 'action' => 'store_true',
                 'help' => 'Enable verbose output',
@@ -74,7 +79,7 @@ class MinimalCli
         }
 
         // Parse options for other commands
-        list($options, $args) = $this->parser->parseArgs($argv);
+        [$options, $args] = $this->parser->parseArgs($argv);
 
         // Handle --version
         if ($options->version) {
@@ -313,7 +318,7 @@ class MinimalCli
 
             if (file_exists($hordeBase . '/lib/Application.php')) {
                 echo "  ✓ Application.php found\n";
-            } else if (file_exists($hordeBase . '/src/Application.php')) {
+            } elseif (file_exists($hordeBase . '/src/Application.php')) {
                 echo "  ✓ Application.php found (src/)\n";
             } else {
                 echo "  ✗ Application.php not found\n";
@@ -404,7 +409,7 @@ class MinimalCli
 
             echo "Attempting Horde_Registry::appInit()...\n";
 
-            $app = \Horde_Registry::appInit('horde', ['cli' => true]);
+            $app = Horde_Registry::appInit('horde', ['cli' => true]);
 
             echo "✓ Bootstrap successful!\n";
             echo "\n";
@@ -412,7 +417,7 @@ class MinimalCli
             echo "\n";
             return 0;
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             echo "✗ Bootstrap failed\n";
             echo "\n";
             echo "Error: " . $e->getMessage() . "\n";
@@ -502,7 +507,7 @@ class MinimalCli
         try {
             $composerBin = $composerHelper->detectComposerBin();
             echo "  ✓ Composer found: $composerBin\n";
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             fwrite(STDERR, "\nError: " . $e->getMessage() . "\n");
             fwrite(STDERR, "\n");
             fwrite(STDERR, "Install composer from https://getcomposer.org/\n");
@@ -693,7 +698,7 @@ class MinimalCli
         // Check if target directory exists
         if (!is_dir($targetDir)) {
             echo "  • Creating target directory...\n";
-            if (!mkdir($targetDir, 0755, true)) {
+            if (!mkdir($targetDir, 0o755, true)) {
                 fwrite(STDERR, "\nError: Failed to create directory: $targetDir\n");
                 fwrite(STDERR, "Check permissions.\n");
                 fwrite(STDERR, "\n");

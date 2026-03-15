@@ -1,21 +1,33 @@
 <?php
 
 namespace Horde\Hordectl\Command\Query;
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use Horde\Injector\Injector;
+
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Injector\Injector;
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Exception;
+use Horde_Cli;
+use RuntimeException;
+
 /**
+ * Query command module for Horde users via Admin REST API
  *
- * Query command module for Horde users
+ * Uses modern AdminApiClient instead of legacy UserRepo.
  */
-class User
-implements Module, ModuleUsage
+class User implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    private AdminApiClient $apiClient;
+
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
@@ -45,50 +57,72 @@ implements Module, ModuleUsage
             return false;
         }
 
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
+
         $writer = $this->dependencies->getInstance('\Horde\Hordectl\YamlWriter');
-        $exporter = $this->dependencies->getInstance('UserRepo');
 
-        // Check if a specific username was provided
-        if (isset($argv[1]) && !empty($argv[1])) {
-            $username = $argv[1];
+        try {
+            // Check if a specific username was provided
+            if (isset($argv[1]) && !empty($argv[1])) {
+                $username = $argv[1];
 
-            try {
-                $auth = $this->dependencies->getInstance('\Horde_Auth_Base');
+                // Get single user via API
+                $user = $this->apiClient->getUser($username);
 
-                if (!$auth->exists($username)) {
-                    $this->cli->message(
-                        sprintf('User "%s" not found', $username),
-                        'cli.error'
-                    );
-                    return true;
-                }
+                // Convert to legacy YAML format
+                $items = [[
+                    'userUid' => $user->username,
+                    'identities' => $user->identities,
+                ]];
 
-                // Export only the specified user
-                $allItems = $exporter->export();
-                $items = array_filter($allItems, function($item) use ($username) {
-                    return isset($item['userUid']) && $item['userUid'] === $username;
-                });
+                $writer->addResource('builtin', 'user', $items);
+            } else {
+                // Export all users
+                $page = 1;
+                $perPage = 100;
+                $allUsers = [];
 
-                if (empty($items)) {
-                    $this->cli->message(
-                        sprintf('User "%s" exists but could not be exported', $username),
-                        'cli.error'
-                    );
-                    return true;
-                }
+                do {
+                    $userList = $this->apiClient->listUsers($page, $perPage);
 
-                $writer->addResource('builtin', 'user', array_values($items));
-            } catch (\Exception $e) {
+                    foreach ($userList->toArray() as $user) {
+                        $allUsers[] = [
+                            'userUid' => $user->username,
+                            'identities' => $user->identities,
+                        ];
+                    }
+
+                    $page++;
+                } while ($userList->hasNext);
+
+                $writer->addResource('builtin', 'user', $allUsers);
+            }
+        } catch (RuntimeException $e) {
+            // Check if it's a 404 error (user not found)
+            if (strpos($e->getMessage(), 'USER_NOT_FOUND') !== false) {
                 $this->cli->message(
-                    sprintf('Error querying user: %s', $e->getMessage()),
+                    sprintf('User "%s" not found', $argv[1] ?? 'unknown'),
                     'cli.error'
                 );
-                return true;
+            } else {
+                $this->cli->message(
+                    sprintf('Error querying users: %s', $e->getMessage()),
+                    'cli.error'
+                );
+                // Re-throw for debugging
+                throw $e;
             }
-        } else {
-            // Export all users
-            $items = $exporter->export();
-            $writer->addResource('builtin', 'user', $items);
+            return false;  // Changed from true to false to indicate failure
+        } catch (Exception $e) {
+            $this->cli->message(
+                sprintf('Error querying users: %s', $e->getMessage()),
+                'cli.error'
+            );
+            // Re-throw for debugging
+            throw $e;
+            return false;  // Changed from true to false
         }
 
         return true;

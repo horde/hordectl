@@ -391,7 +391,7 @@ class ConfigHelperTest extends TestCase
         $this->createTestConfigFile();
 
         // Make directory non-writable
-        chmod($this->testDir . '/config', 0444);
+        chmod($this->testDir . '/config', 0o444);
 
         try {
             $helper = new ConfigHelper('horde', $this->testDir);
@@ -403,7 +403,7 @@ class ConfigHelperTest extends TestCase
             $helper->save();
         } finally {
             // Restore permissions for cleanup
-            chmod($this->testDir . '/config', 0755);
+            chmod($this->testDir . '/config', 0o755);
         }
     }
 

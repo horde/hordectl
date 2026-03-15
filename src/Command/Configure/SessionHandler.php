@@ -20,6 +20,7 @@ use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
+use Horde_Cli;
 
 /**
  * Configure session handler settings
@@ -40,7 +41,7 @@ class SessionHandler implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -65,7 +66,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Session handler type (builtin, file, sql, memcache, memcached, external)'
+                    'help' => 'Session handler type (builtin, file, sql, memcache, memcached, external)',
                 ]
             ),
             new Option(
@@ -73,7 +74,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Session save path (for file and builtin types)'
+                    'help' => 'Session save path (for file and builtin types)',
                 ]
             ),
             new Option(
@@ -81,7 +82,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Memcache server list (comma-separated host:port)'
+                    'help' => 'Memcache server list (comma-separated host:port)',
                 ]
             ),
             new Option(
@@ -89,7 +90,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Session timeout in seconds'
+                    'help' => 'Session timeout in seconds',
                 ]
             ),
             new Option(
@@ -97,7 +98,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Garbage collection maximum lifetime in seconds'
+                    'help' => 'Garbage collection maximum lifetime in seconds',
                 ]
             ),
             new Option(
@@ -105,7 +106,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Garbage collection probability (0-100)'
+                    'help' => 'Garbage collection probability (0-100)',
                 ]
             ),
             new Option(
@@ -113,7 +114,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Use cookies for session ID (true/false)'
+                    'help' => 'Use cookies for session ID (true/false)',
                 ]
             ),
             new Option(
@@ -121,7 +122,7 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Send cookie only over secure connections (true/false)'
+                    'help' => 'Send cookie only over secure connections (true/false)',
                 ]
             ),
             new Option(
@@ -129,21 +130,21 @@ class SessionHandler implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Set HttpOnly flag on cookies (true/false)'
+                    'help' => 'Set HttpOnly flag on cookies (true/false)',
                 ]
             ),
             new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
-                    'help' => 'Interactive mode with prompts'
+                    'help' => 'Interactive mode with prompts',
                 ]
             ),
             new Option(
                 '--show',
                 [
                     'action' => 'store_true',
-                    'help' => 'Show current session configuration'
+                    'help' => 'Show current session configuration',
                 ]
             ),
         ];
@@ -162,13 +163,16 @@ class SessionHandler implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireConfigureCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Create ConfigHelper
@@ -209,9 +213,9 @@ class SessionHandler implements Module, ModuleUsage
      */
     private function hasConfigOptions(object $opts): bool
     {
-        return isset($opts->type) || isset($opts->path) || isset($opts->memcache) ||
-               isset($opts->timeout) || isset($opts->gc_maxlifetime) || isset($opts->gc_probability) ||
-               isset($opts->use_cookies) || isset($opts->cookie_secure) || isset($opts->cookie_httponly);
+        return isset($opts->type) || isset($opts->path) || isset($opts->memcache)
+               || isset($opts->timeout) || isset($opts->gc_maxlifetime) || isset($opts->gc_probability)
+               || isset($opts->use_cookies) || isset($opts->cookie_secure) || isset($opts->cookie_httponly);
     }
 
     /**
@@ -274,10 +278,10 @@ class SessionHandler implements Module, ModuleUsage
         $currentTimeout = $helper->getValue('sessionhandler.timeout') ?? 0;
         $timeout = $this->cli->prompt(
             'Session timeout in seconds (0 for default):',
-            (string)$currentTimeout
+            (string) $currentTimeout
         );
         if ($timeout !== '0') {
-            $helper->setValue('sessionhandler.timeout', (int)$timeout);
+            $helper->setValue('sessionhandler.timeout', (int) $timeout);
         } else {
             $helper->unsetValue('sessionhandler.timeout');
         }
@@ -286,17 +290,17 @@ class SessionHandler implements Module, ModuleUsage
         $currentMaxlifetime = $helper->getValue('sessionhandler.gc_maxlifetime') ?? 1440;
         $maxlifetime = $this->cli->prompt(
             'Garbage collection max lifetime in seconds:',
-            (string)$currentMaxlifetime
+            (string) $currentMaxlifetime
         );
-        $helper->setValue('sessionhandler.gc_maxlifetime', (int)$maxlifetime);
+        $helper->setValue('sessionhandler.gc_maxlifetime', (int) $maxlifetime);
 
         // GC probability
         $currentProbability = $helper->getValue('sessionhandler.gc_probability') ?? 1;
         $probability = $this->cli->prompt(
             'Garbage collection probability (0-100):',
-            (string)$currentProbability
+            (string) $currentProbability
         );
-        $helper->setValue('sessionhandler.gc_probability', (int)$probability);
+        $helper->setValue('sessionhandler.gc_probability', (int) $probability);
 
         $this->cli->writeln();
         $this->cli->writeln('Cookie settings:');
@@ -449,15 +453,15 @@ class SessionHandler implements Module, ModuleUsage
 
             // Parse host:port
             if (strpos($server, ':') !== false) {
-                list($host, $port) = explode(':', $server, 2);
+                [$host, $port] = explode(':', $server, 2);
                 $serverList[] = [
                     'hostspec' => trim($host),
-                    'port' => (int)trim($port)
+                    'port' => (int) trim($port),
                 ];
             } else {
                 $serverList[] = [
                     'hostspec' => trim($server),
-                    'port' => 11211  // Default memcache port
+                    'port' => 11211,  // Default memcache port
                 ];
             }
         }

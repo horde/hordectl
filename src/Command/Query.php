@@ -1,23 +1,25 @@
 <?php
 
 namespace Horde\Hordectl\Command;
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use \Horde\Hordectl\HasModulesTrait;
+
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\HasModulesTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
+use Horde_Cli;
+
 /**
  *
  * Query command module implements CLI Query Yaml output
  */
-class Query
-implements Module, ModuleUsage
+class Query implements Module, ModuleUsage
 {
     use ModuleTrait;
     use HasModulesTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
 
     public function __construct(Injector $dependencies)
     {
@@ -60,7 +62,7 @@ implements Module, ModuleUsage
             return false;
         }
 
-        list($myArgs, $moduleArgs) = $this->handleCommandline($argv);
+        [$myArgs, $moduleArgs] = $this->handleCommandline($argv);
 
         // Show help if no subcommand provided
         if (empty($moduleArgs)) {
@@ -99,7 +101,14 @@ implements Module, ModuleUsage
         $this->cli->writeln();
         $this->cli->writeln('Query and export Horde resources as YAML format.');
         $this->cli->writeln();
+        $this->cli->writeln($this->cli->yellow('Note: Query commands require a target with API endpoint configured.'));
+        $this->cli->writeln('      Local targets need --endpoint, or switch to a remote target.');
+        $this->cli->writeln();
         $this->cli->writeln('Available resource types:');
+        $this->cli->writeln();
+        $this->cli->writeln('  apps                  Query applications (meta-resources via REST API)');
+        $this->cli->writeln('                        - Lists all registered applications');
+        $this->cli->writeln('                        - Applications define resource types (like Kubernetes CRDs)');
         $this->cli->writeln();
         $this->cli->writeln('  user [username]       Query user accounts and identities');
         $this->cli->writeln('                        - Without username: export all users');
@@ -109,19 +118,20 @@ implements Module, ModuleUsage
         $this->cli->writeln('                        - Without groupname: export all groups');
         $this->cli->writeln('                        - With groupname: export specific group');
         $this->cli->writeln();
-        $this->cli->writeln('  app [appname]         Query application configuration');
-        $this->cli->writeln('                        - Without appname: export all apps');
-        $this->cli->writeln('                        - With appname: export specific app');
-        $this->cli->writeln();
         $this->cli->writeln('  permission [name]     Query permissions');
         $this->cli->writeln('                        - Without name: export all permissions');
         $this->cli->writeln('                        - With name: export specific permission');
         $this->cli->writeln();
+        $this->cli->writeln('  {app}/{resource}      Query app-specific resources (via legacy bootstrap)');
+        $this->cli->writeln('                        - Example: turba/contacts, kronolith/events');
+        $this->cli->writeln('                        - Requires Horde bootstrap and app ApplicationResources class');
+        $this->cli->writeln();
         $this->cli->writeln('Examples:');
+        $this->cli->writeln('  hordectl query apps                    # List applications via REST API');
         $this->cli->writeln('  hordectl query user                    # Export all users');
         $this->cli->writeln('  hordectl query user administrator      # Export specific user');
         $this->cli->writeln('  hordectl query group                   # Export all groups');
-        $this->cli->writeln('  hordectl query group admins            # Export specific group');
+        $this->cli->writeln('  hordectl query turba/contacts          # Export Turba contacts');
         $this->cli->writeln();
         $this->cli->writeln('Output is in YAML format, suitable for use with "hordectl import".');
         $this->cli->writeln();
@@ -168,6 +178,6 @@ Output is in YAML format, suitable for use with "hordectl import".
      */
     public function getSummary()
     {
-        return 'Query and export Horde resources (user, group, app, permission)';
+        return 'Query and export Horde resources via API (requires API endpoint)';
     }
 }

@@ -1,21 +1,24 @@
 <?php
 
 namespace Horde\Hordectl\Command;
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
+use Exception;
+use Horde_Cli;
+
 /**
  *
  * Help command module implements CLI help/usage
  */
-class Help
-implements Module, ModuleUsage
+class Help implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     protected Parser $parser;
 
     public function __construct(Injector $dependencies)
@@ -77,7 +80,19 @@ implements Module, ModuleUsage
 
         $this->cli->writeln();
         $this->cli->writeln('Environment:');
-        $this->cli->writeln('  Horde installation: ' . $this->dependencies->findHordePath());
+
+        // Show current target information instead of Horde installation path
+        try {
+            $config = new \Horde\Hordectl\ConfigManager();
+            $currentTarget = $config->get('current-target');
+            if ($currentTarget) {
+                $this->cli->writeln('  Current target: ' . $currentTarget);
+            } else {
+                $this->cli->writeln('  No target configured (run: hordectl target add)');
+            }
+        } catch (Exception $e) {
+            $this->cli->writeln('  No target configured');
+        }
 
         $this->cli->writeln();
         $this->cli->writeln('For command-specific help, run:');
@@ -111,10 +126,21 @@ implements Module, ModuleUsage
             $this->cli->writeln(str_repeat('=', strlen('Command: ' . $commandName)));
             $this->cli->writeln();
 
-            // Check if command has getUsage method
-            if (method_exists($command, 'getUsage')) {
+            // Check if command has detailed usage description
+            if (method_exists($command, 'getUsageDescription')) {
+                $description = $command->getUsageDescription();
+                if (is_array($description)) {
+                    foreach ($description as $line) {
+                        $this->cli->writeln($line);
+                    }
+                } else {
+                    $this->cli->writeln($description);
+                }
+                $this->cli->writeln();
+            } elseif (method_exists($command, 'getUsage')) {
                 $usage = $command->getUsage();
                 $this->cli->writeln($usage);
+                $this->cli->writeln();
             } elseif (method_exists($command, 'getSummary')) {
                 $summary = $command->getSummary();
                 $this->cli->writeln($summary);
@@ -123,7 +149,7 @@ implements Module, ModuleUsage
                 $this->cli->writeln('No detailed help available for this command.');
                 $this->cli->writeln();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->cli->message('Error loading command: ' . $e->getMessage(), 'cli.error');
             $this->cli->writeln();
         }
@@ -138,12 +164,55 @@ implements Module, ModuleUsage
     {
         return [
             'help' => 'Show this help message',
-            'query' => 'Query and export Horde resources (user, group, app, permission)',
-            'import' => 'Import resources into Horde from YAML',
-            'patch' => 'Modify individual resources (patch user <username> <password>)',
-            'configure' => 'Configure Horde subsystems and settings',
-            'activate' => 'Activate Horde applications',
+            'target' => 'Manage multi-target configuration (current, list, use, add, etc.)',
+            'query' => 'Query and export Horde resources via API (requires API endpoint)',
+            'import' => 'Import resources into Horde from YAML (requires API endpoint)',
+            'patch' => 'Modify individual resources (requires API endpoint)',
+            'configure' => 'Configure Horde subsystems (local only - requires filesystem)',
+            'activate' => 'Activate Horde applications (local only - requires filesystem)',
             'test' => 'Test Horde subsystems (db, cache, session, logger, auth, jwt, all)',
+            'version' => 'Show version information',
+            'secret' => 'Manage API secrets (generate, show)',
+        ];
+    }
+
+    /**
+     * Get module usage information
+     *
+     * @return string
+     */
+    public function getUsage(): string
+    {
+        return 'Show help and usage information';
+    }
+
+    /**
+     * Get module title
+     *
+     * @return string
+     */
+    public function getTitle(): string
+    {
+        return 'help';
+    }
+
+    /**
+     * Get detailed usage description
+     *
+     * @return array
+     */
+    public function getUsageDescription(): array
+    {
+        return [
+            'Display help information for hordectl commands',
+            '',
+            'Usage:',
+            '  hordectl help              Show all available commands',
+            '  hordectl help <command>    Show detailed help for a specific command',
+            '',
+            'Examples:',
+            '  hordectl help query        Show help for query command',
+            '  hordectl help import       Show help for import command',
         ];
     }
 }

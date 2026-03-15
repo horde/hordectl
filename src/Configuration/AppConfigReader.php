@@ -1,6 +1,9 @@
 <?php
 
 namespace Horde\Hordectl\Configuration;
+
+use Horde_Registry;
+
 /**
  * Handles reading a stack of configuration files
  *
@@ -9,14 +12,14 @@ class AppConfigReader
 {
     protected $registry;
 
-    public function __construct(\Horde_Registry $registry)
+    public function __construct(Horde_Registry $registry)
     {
         $this->registry = $registry;
     }
 
     /**
      * Read a stack of application $conf files
-     * 
+     *
      * TODO: Factor out reusable parts for "backends", yaml configs etc
      */
     public function getAppConfig(string $forApp = '', string $context = '')

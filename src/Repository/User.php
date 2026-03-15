@@ -1,10 +1,14 @@
 <?php
+
 namespace Horde\Hordectl\Repository;
-use \Horde_Auth_Base as AuthDriver;
-use \Horde_Core_Factory_Identity as IdentityDriver;
+
+use Horde_Auth_Base as AuthDriver;
+use Horde_Core_Factory_Identity as IdentityDriver;
+use Horde_Auth;
+
 //use \Horde\Hordectl\Compat\Horde_Core_Factory_Identity as IdentityDriver;
 /**
- * Resource User handles querying and formatting 
+ * Resource User handles querying and formatting
  * user representations
  */
 class User
@@ -19,9 +23,9 @@ class User
 
     /**
      * Export user uid's
-     * 
+     *
      * TODO: handle primary identity (name, email)
-     * 
+     *
      */
     public function export()
     {
@@ -30,18 +34,18 @@ class User
             $identities = $this->_identity->create($uid);
             $baseItem = [
                 'userUid' => $uid,
-                'isLocked' => $this->_driver->hasCapability('lock') ? 
-                    $this->_driver->isLocked($uid) :
-                       false
+                'isLocked' => $this->_driver->hasCapability('lock')
+                    ? $this->_driver->isLocked($uid)
+                       : false,
             ];
             $identities = [];
-    
+
             foreach ($this->_identity->create($uid) as $id => $identity) {
                 $identities[$id] = [
                     'id'        => $identity['id'],
                     'fullname'  => $identity['fullname'],
                     'from_addr' => $identity['from_addr'],
-                    'location'  => $identity['location']
+                    'location'  => $identity['location'],
                 ];
             }
             $baseItem['identities'] = $identities;
@@ -57,9 +61,9 @@ class User
             return;
         }
         if (!$this->_driver->exists($item['userUid'])) {
-            $password = empty($item['password']) ? 
-                \Horde_Auth::genRandomPassword() :
-                $item['password'];
+            $password = empty($item['password'])
+                ? Horde_Auth::genRandomPassword()
+                : $item['password'];
             $credentials = ['password' => $password];
             $this->_driver->addUser($item['userUid'], $credentials);
         }
@@ -67,7 +71,8 @@ class User
         $this->_saveIdentities($item);
     }
 
-    private function _saveIdentities(array $item) {
+    private function _saveIdentities(array $item)
+    {
         $identities = $this->_identity->create($item['userUid']);
         if (empty($item['identities'])) {
             return;
@@ -89,7 +94,7 @@ class User
         }
     }
 
-    public function exists(string $uid) : bool
+    public function exists(string $uid): bool
     {
         return $this->_driver->exists($uid);
     }

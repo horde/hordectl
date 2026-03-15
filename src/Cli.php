@@ -1,17 +1,21 @@
 <?php
+
 /**
  * hordectl CLI Root module
  */
 
 namespace Horde\Hordectl;
+
+use Horde\Argv\IndentedHelpFormatter;
+use Horde\Argv\Option;
+use Horde\Argv\Parser;
+use Horde\Exception\HordeException;
 use Horde\Injector\Injector;
 use Horde\Injector\TopLevel;
-use Horde\Exception\HordeException;
-use Horde\Argv\IndentedHelpFormatter;
-use Horde\Argv\Parser;
-use \Horde_Cli_Modular as Cli_Modular;
-use \Horde_Cli_Modular_Module as Module;
 use Horde_Cli;
+use Horde_Cli_Modular as Cli_Modular;
+use Horde_Cli_Modular_Module as Module;
+use Horde_String;
 
 /**
  * Hordectl CLI Root Module
@@ -48,42 +52,55 @@ class Cli implements Module
         $this->_initModules($dependencies, $prefix, $directory, $exclude);
     }
 
+    /**
+     * Get base options for global flags
+     *
+     * Global --target flag allows temporary target override without changing
+     * the persistent current target configuration.
+     *
+     * Usage: hordectl --target=NAME COMMAND [ARGS]
+     *
+     * Note: Global options must come BEFORE the command name due to parser
+     * configuration (allowInterspersedArgs = false).
+     *
+     * @return array Array of Option objects for global flags
+     */
+    public function getBaseOptions(): array
+    {
+        return [
+            new Option(
+                '--target',
+                [
+                    'action' => 'store',
+                    'type' => 'string',
+                    'dest' => 'override_target',
+                    'metavar' => 'NAME',
+                    'help' => 'Temporarily use specified target (does not change current)',
+                ]
+            ),
+        ];
+    }
+
     // Setup a Horde_Cli_Modular, a Parser, setup self as root module
-    public static function main(array $parameters = array())
+    public static function main(array $parameters = [])
     {
         // Use plain Horde Injector as long as we have no need to wrap it into something more specific
-        $cli = new \Horde_Cli(array('pager' => true));
-        try {
-            $dependencies = new Dependencies(new TopLevel);
-            $dependencies->setInstance('\Horde_Cli', $cli);
-            $dependencies->bootstrapHorde();
-        } catch (HordeNotFoundException $e) {
-            $cli->writeln("Error: Horde installation not found. Please set the HORDE_GIT_DIR or HORDE_BASE environment variables.");
-            return false;
-        } catch (HordeBootstrapException $e) {
-            // Bootstrap failed - fall back to minimal CLI
-            fwrite(STDERR, "\n");
-            fwrite(STDERR, "Warning: Horde bootstrap failed\n");
-            fwrite(STDERR, "Error: " . $e->getMessage() . "\n");
-            fwrite(STDERR, "\n");
-            fwrite(STDERR, "Running in minimal mode with limited commands.\n");
-            fwrite(STDERR, "Use 'hordectl help' to see available commands.\n");
-            fwrite(STDERR, "\n");
+        $cli = new Horde_Cli(['pager' => true]);
 
-            // Load config and run minimal CLI
-            $config = new ConfigManager();
-            $minimalCli = new MinimalCli($config);
-            return $minimalCli->run($parameters['argv']);
-        }
+        // Setup dependencies (no Horde bootstrap - target-based approach only)
+        $dependencies = new Dependencies(new TopLevel());
+        $dependencies->setInstance('\Horde_Cli', $cli);
 
-        // TODO: How to handle uninitialized horde? Not all commands may need a working horde
-        // Setup the CLI Parser.
+        // Setup the CLI Parser
         $parser = $dependencies->getInstance(Parser::class);
         $parser->allowInterspersedArgs = false;
+
         // Setup the modules system
         $modular = self::_prepareModular($dependencies);
+
         // Setup self as the root module
         $CliModule = $dependencies->getInstance('\Horde\Hordectl\Cli');
+
         array_shift($parameters['argv']);
         if (count($parameters['argv']) < 1) {
             if ($CliModule->isRootModule()) {
@@ -92,22 +109,31 @@ class Cli implements Module
             // preliminary index of commands
             $cli->writeln("Found Modules:");
             foreach ($CliModule->listModules() as $module) {
-                $cli->writeln(\Horde_String::lower($module->getTitle()));
+                $cli->writeln(Horde_String::lower($module->getTitle()));
             }
         }
+
         // Fetch the cli module's direct parameters and run its handle method
         $globalOpts = $CliModule->handleCommandline($parameters['argv']);
+
+        // Handle global --target flag if provided
+        if (isset($globalOpts[0]->override_target) && !empty($globalOpts[0]->override_target)) {
+            $dependencies->setInstance('hordectl.target_override', $globalOpts[0]->override_target);
+        }
+
         $CliModule->handle($globalOpts[1]);
     }
 
-    public function handle(array $argv = []) : bool
+    public function handle(array $argv = []): bool
     {
         // Each module will decide if it is responsible for the entered command
         // Cycle through modules and call each module's handle method.
         try {
             $ran = false;
-            foreach ($this->listModules() as $class => $module) {
-                $ran |= $module->handle($argv);
+            $modules = $this->listModules();
+            foreach ($modules as $class => $module) {
+                $result = $module->handle($argv);
+                $ran |= $result;
             }
         } catch (HordeException $e) {
             return false;
@@ -128,6 +154,9 @@ class Cli implements Module
         $this->cli->writeln();
         $this->cli->writeln('Usage: hordectl [OPTIONS] COMMAND [ARGUMENTS]');
         $this->cli->writeln();
+        $this->cli->writeln('Global options:');
+        $this->cli->writeln('  --target=<name>    Temporarily use specified target (does not change current)');
+        $this->cli->writeln();
         $this->cli->writeln('Available commands:');
 
         // Build list of commands with their descriptions
@@ -145,9 +174,10 @@ class Cli implements Module
         // Sort alphabetically by command name
         ksort($commands);
 
-        // Display sorted commands
+        // Display sorted commands with green command names
         foreach ($commands as $name => $description) {
-            $this->cli->writeln('  ' . str_pad($name, 15) . ' ' . $description);
+            $coloredName = $this->cli->green($name);
+            $this->cli->writeln('  ' . str_pad($coloredName, 15 + strlen($coloredName) - strlen($name)) . ' ' . $description);
         }
 
         $this->cli->writeln();
@@ -157,49 +187,54 @@ class Cli implements Module
 
     /**
      * Get a brief description for a module
+     *
+     * Returns a one-line summary, not the full detailed description.
      */
     protected function getModuleDescription(string $name): string
     {
+        // Hardcoded brief descriptions - one line only
         $descriptions = [
-            'help' => 'Show help and list available applications',
-            'query' => 'Query and export Horde resources as YAML',
+            'activate' => 'Activate Horde installation by copying default configuration',
+            'configure' => 'Configure Horde subsystems and settings',
+            'help' => 'Show help and usage information',
             'import' => 'Import resources into Horde from YAML',
             'patch' => 'Modify individual Horde resources',
-            'configure' => 'Configure Horde subsystems and settings',
-            'activate' => 'Activate Horde installation by copying default configuration',
+            'query' => 'Query and export Horde resources as YAML',
+            'secret' => 'Manage admin_secret for REST API authentication',
             'test' => 'Test Horde subsystems (db, cache, session, logger, auth, jwt)',
+            'version' => 'Display version information',
         ];
 
         return $descriptions[$name] ?? '';
     }
 
-   /**
-     * Prepare the modular CLI instance.
-     *
-     * Adapted from Horde git-tools CLI
-     * @param  Injector $dependencies  The dependency container.
-     *
-     * @return \Horde_Cli_Modular  The modular CLI object.
-     */
+    /**
+      * Prepare the modular CLI instance.
+      *
+      * Adapted from Horde git-tools CLI
+      * @param  Injector $dependencies  The dependency container.
+      *
+      * @return Cli_Modular  The modular CLI object.
+      */
     protected static function _prepareModular($dependencies)
     {
         // The modular CLI helper.
         $formatter = new IndentedHelpFormatter();
-        $modular = new Cli_Modular(array(
-            'parser' => array('usage' => '[OPTIONS] COMMAND [ARGUMENTS]
+        $modular = new Cli_Modular([
+            'parser' => ['usage' => '[OPTIONS] COMMAND [ARGUMENTS]
   ' . $formatter->highlightOption('COMMAND') . ' - Selects the command to perform. This is a list of possible commands:
-'
-            ),
-            'modules' => array(
+',
+            ],
+            'modules' => [
                 'directory' => __DIR__ . '/Command/',
-                'exclude' => 'Base'
-            ),
-            'provider' => array(
+                'exclude' => 'Base',
+            ],
+            'provider' => [
                 'prefix' => '\Horde\Hordectl\Command\\',
-                'dependencies' => $dependencies
-            ),
+                'dependencies' => $dependencies,
+            ],
             'cli' => $dependencies->getInstance('\Horde_Cli'),
-        ));
+        ]);
         return $modular;
     }
 }

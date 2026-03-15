@@ -1,20 +1,24 @@
 <?php
+
 namespace Horde\Hordectl;
+
+use Exception;
+use Throwable;
 
 /**
  * Exception thrown when Horde bootstrap fails
  */
-class HordeBootstrapException extends \Exception
+class HordeBootstrapException extends Exception
 {
-    private ?\Throwable $originalException = null;
+    private ?Throwable $originalException = null;
 
-    public function __construct(string $message, ?\Throwable $previous = null)
+    public function __construct(string $message, ?Throwable $previous = null)
     {
         parent::__construct($message, 0, $previous);
         $this->originalException = $previous;
     }
 
-    public function getOriginalException(): ?\Throwable
+    public function getOriginalException(): ?Throwable
     {
         return $this->originalException;
     }

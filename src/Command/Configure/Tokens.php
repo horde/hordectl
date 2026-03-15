@@ -20,6 +20,7 @@ use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
+use Horde_Cli;
 
 /**
  * Configure tokens system
@@ -40,7 +41,7 @@ class Tokens implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -60,7 +61,7 @@ class Tokens implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Token storage driver (sql, file, mock)'
+                    'help' => 'Token storage driver (sql, file, mock)',
                 ]
             ),
             new Option(
@@ -68,7 +69,7 @@ class Tokens implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Secret key for token generation (auto-generated if not provided)'
+                    'help' => 'Secret key for token generation (auto-generated if not provided)',
                 ]
             ),
             new Option(
@@ -76,21 +77,21 @@ class Tokens implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Default token expiration in seconds'
+                    'help' => 'Default token expiration in seconds',
                 ]
             ),
             new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
-                    'help' => 'Interactive mode with prompts'
+                    'help' => 'Interactive mode with prompts',
                 ]
             ),
             new Option(
                 '--show',
                 [
                     'action' => 'store_true',
-                    'help' => 'Show current token configuration'
+                    'help' => 'Show current token configuration',
                 ]
             ),
         ];
@@ -109,13 +110,16 @@ class Tokens implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireConfigureCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Create ConfigHelper
@@ -226,9 +230,9 @@ class Tokens implements Module, ModuleUsage
         $currentExpiration = $helper->getValue('token.expiration') ?? 86400;
         $expiration = $this->cli->prompt(
             'Default token expiration in seconds (86400 = 1 day):',
-            (string)$currentExpiration
+            (string) $currentExpiration
         );
-        $helper->setValue('token.expiration', (int)$expiration);
+        $helper->setValue('token.expiration', (int) $expiration);
 
         if ($driver === 'sql') {
             $this->cli->writeln();

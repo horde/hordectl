@@ -54,8 +54,8 @@ class ConfigHelper
             $this->confDir = $envDir . '/var/config/' . $app;
         } else {
             throw new RuntimeException(
-                'Cannot determine Horde installation directory. ' .
-                'Set HORDE_INSTALL_DIR environment variable or use ConfigManager.'
+                'Cannot determine Horde installation directory. '
+                . 'Set HORDE_INSTALL_DIR environment variable or use ConfigManager.'
             );
         }
 
@@ -66,18 +66,18 @@ class ConfigHelper
         // Check if configuration directory exists
         if (!is_dir($this->confDir)) {
             throw new RuntimeException(
-                "Configuration directory does not exist: {$this->confDir}\n\n" .
-                "The Horde installation may not be activated.\n" .
-                "Run 'hordectl activate' to initialize the installation."
+                "Configuration directory does not exist: {$this->confDir}\n\n"
+                . "The Horde installation may not be activated.\n"
+                . "Run 'hordectl activate' to initialize the installation."
             );
         }
 
         // Warn if conf.php doesn't exist
         if (!$this->fileExists) {
             throw new RuntimeException(
-                "Configuration file not found: {$this->confFile}\n\n" .
-                "The Horde installation is not activated.\n" .
-                "Run 'hordectl activate' to copy the default configuration."
+                "Configuration file not found: {$this->confFile}\n\n"
+                . "The Horde installation is not activated.\n"
+                . "Run 'hordectl activate' to copy the default configuration."
             );
         }
 

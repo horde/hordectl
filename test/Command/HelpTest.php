@@ -11,6 +11,7 @@ use Horde\Argv\Parser;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use stdClass;
 
 /**
  * Test the Help command
@@ -101,7 +102,7 @@ class HelpTest extends TestCase
                     return $this->mockParser;
                 }
                 if ($class === 'HordeRegistry') {
-                    $mockRegistry = new \stdClass();
+                    $mockRegistry = new stdClass();
                     $mockRegistry->applications = [];
                     return $mockRegistry;
                 }
@@ -144,7 +145,7 @@ class HelpTest extends TestCase
                     return $this->mockParser;
                 }
                 if ($class === 'HordeRegistry') {
-                    $mockRegistry = new \stdClass();
+                    $mockRegistry = new stdClass();
                     $mockRegistry->applications = [];
                     return $mockRegistry;
                 }
@@ -180,9 +181,9 @@ class HelpTest extends TestCase
         $mockCli = $this->createMock(Horde_Cli::class);
         $mockParser = $this->createMock(Parser::class);
 
-        $mockRegistry = new \stdClass();
+        $mockRegistry = new stdClass();
         $mockRegistry->applications = [
-            'testapp' => ['status' => 'active']
+            'testapp' => ['status' => 'active'],
         ];
 
         $mockInjector->method('getInstance')

@@ -1,6 +1,9 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Horde\Hordectl;
+
 use ArrayObject;
 
 class Environment extends ArrayObject

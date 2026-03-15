@@ -15,11 +15,23 @@
         "test"
       ],
       "in": "vendor"
+    },
+    {
+      "name": "*",
+      "in": "vendor/horde/argv/locale"
+    },
+    {
+      "name": "*",
+      "in": "vendor/horde/cli/locale"
+    },
+    {
+      "name": "*",
+      "in": "vendor/horde/exception/locale"
     }
   ],
   "git-version": "package_version",
   "intercept": true,
   "main": "bin/hordectl",
-  "output": "hordectl.phar",
+  "output": "build/hordectl.phar",
   "stub": true
 }

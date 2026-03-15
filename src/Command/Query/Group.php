@@ -1,26 +1,34 @@
 <?php
 
 namespace Horde\Hordectl\Command\Query;
-use \Horde\Hordectl\Resource\GroupResource;
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use Horde\Injector\Injector;
+
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Injector\Injector;
+use Horde_Cli;
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use RuntimeException;
+
 /**
- *
  * Query command module for Horde Group
  */
-class Group
-implements Module, ModuleUsage
+class Group implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    private AdminApiClient $apiClient;
+
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(Horde_Cli::class);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -46,33 +54,42 @@ implements Module, ModuleUsage
             return false;
         }
 
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
+
         $writer = $this->dependencies->getInstance('\Horde\Hordectl\YamlWriter');
-        unset($GLOBALS['conf']);
-        $exporter = $this->dependencies->getInstance('GroupRepo');
 
-        // Check if a specific group name was provided
-        if (isset($argv[1]) && !empty($argv[1])) {
-            $groupname = $argv[1];
+        try {
+            // Check if a specific group name/ID was provided
+            if (isset($argv[1]) && !empty($argv[1])) {
+                $identifier = $argv[1];
 
-            // Export all groups and filter
-            $allItems = $exporter->export();
-            $items = array_filter($allItems, function($item) use ($groupname) {
-                return isset($item['groupName']) && $item['groupName'] === $groupname;
-            });
+                // Get single group
+                $group = $this->apiClient->getGroup($identifier);
+                $writer->addResource('builtin', 'group', [$group->toArray()]);
+            } else {
+                // Get all groups (paginated)
+                $page = 1;
+                $perPage = 100;
+                $allGroups = [];
 
-            if (empty($items)) {
-                $this->cli->message(
-                    sprintf('Group "%s" not found', $groupname),
-                    'cli.error'
-                );
-                return true;
+                do {
+                    $groupList = $this->apiClient->listGroups($page, $perPage);
+                    foreach ($groupList->groups as $group) {
+                        $allGroups[] = $group->toArray();
+                    }
+                    $page++;
+                } while ($groupList->hasNext);
+
+                $writer->addResource('builtin', 'group', $allGroups);
             }
-
-            $writer->addResource('builtin', 'group', array_values($items));
-        } else {
-            // Export all groups
-            $items = $exporter->export();
-            $writer->addResource('builtin', 'group', $items);
+        } catch (RuntimeException $e) {
+            $this->cli->message(
+                sprintf('Error: %s', $e->getMessage()),
+                'cli.error'
+            );
+            return true;
         }
 
         return true;

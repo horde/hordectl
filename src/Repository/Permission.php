@@ -1,7 +1,12 @@
 <?php
+
 namespace Horde\Hordectl\Repository;
+
+use Horde_Core_Perms;
+use Horde_Perms_Base;
+
 /**
- * Resource Group handles querying and formatting 
+ * Resource Group handles querying and formatting
  * group representations
  */
 class Permission
@@ -10,7 +15,7 @@ class Permission
     private $_corePerms;
     private $_groupRepo;
 
-    public function __construct(\Horde_Perms_Base $perms, \Horde_Core_Perms $corePerms, Group $group)
+    public function __construct(Horde_Perms_Base $perms, Horde_Core_Perms $corePerms, Group $group)
     {
         $this->_perms = $perms;
         $this->_corePerms = $corePerms;
@@ -29,7 +34,7 @@ class Permission
             $groupPerms = $this->_exportGroupPermissions($permission);
 
             $items[] = [
-            //    'permId' => $permId,
+                //    'permId' => $permId,
                 'permName' => $permName,
                 'type' => $data['type'],
                 'users' => $data['users'] ?? [],
@@ -42,11 +47,10 @@ class Permission
         return $items;
     }
 
-    protected function _exportGroupPermissions($permission) : array
+    protected function _exportGroupPermissions($permission): array
     {
         $perms = [];
-        foreach ($permission->getGroupPermissions() as $gid => $level)
-        {
+        foreach ($permission->getGroupPermissions() as $gid => $level) {
             if (!$this->_groupRepo->exists($gid)) {
                 continue;
             }
@@ -57,7 +61,7 @@ class Permission
 
     /**
      * Import a single permission
-     * 
+     *
      * This will overwrite the permission with the definition from yaml.
      */
     public function import(array $item)

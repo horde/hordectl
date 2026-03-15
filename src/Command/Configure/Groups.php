@@ -20,6 +20,7 @@ use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
+use Horde_Cli;
 
 /**
  * Configure groups backend and settings
@@ -39,7 +40,7 @@ class Groups implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -59,7 +60,7 @@ class Groups implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Groups driver (sql, ldap, contactlists, mock)'
+                    'help' => 'Groups driver (sql, ldap, contactlists, mock)',
                 ]
             ),
             new Option(
@@ -67,7 +68,7 @@ class Groups implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Enable caching (true/false)'
+                    'help' => 'Enable caching (true/false)',
                 ]
             ),
             new Option(
@@ -75,21 +76,21 @@ class Groups implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Cache lifetime in seconds'
+                    'help' => 'Cache lifetime in seconds',
                 ]
             ),
             new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
-                    'help' => 'Interactive mode with prompts'
+                    'help' => 'Interactive mode with prompts',
                 ]
             ),
             new Option(
                 '--show',
                 [
                     'action' => 'store_true',
-                    'help' => 'Show current groups configuration'
+                    'help' => 'Show current groups configuration',
                 ]
             ),
         ];
@@ -108,13 +109,16 @@ class Groups implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireConfigureCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Create ConfigHelper
@@ -200,9 +204,9 @@ class Groups implements Module, ModuleUsage
             $currentLifetime = $helper->getValue('group.cache_lifetime') ?? 300;
             $lifetime = $this->cli->prompt(
                 'Cache lifetime in seconds:',
-                (string)$currentLifetime
+                (string) $currentLifetime
             );
-            $helper->setValue('group.cache_lifetime', (int)$lifetime);
+            $helper->setValue('group.cache_lifetime', (int) $lifetime);
         }
 
         // Driver-specific configuration

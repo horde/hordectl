@@ -7,16 +7,23 @@ use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
+use Horde_Cli;
 
 /**
- *
  * Import command module for Horde App provided resources
+ *
+ * UNSUPPORTED: This command requires app-specific CRD (Create/Read/Delete) support
+ * via the Admin REST API, which is not yet implemented. App resources like
+ * turba/contacts, kronolith/events, etc. are not available for import until
+ * the REST API supports app-specific resource operations.
+ *
+ * Status: DEFERRED until REST API CRD support is finished
  */
 class App implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
@@ -28,46 +35,23 @@ class App implements Module, ModuleUsage
 
     public function import(string $app, string $resource, array $tree)
     {
-        // This is needed if the import of this resource requires calls to a Horde_Registry_Api class
-        $this->dependencies->getInstance('Horde_Registry')->setAuthenticationSetting('none');
-        // Break out to apps to decide if we handle this.
-        $apps = $this->dependencies->getRegistryApplications();
+        // UNSUPPORTED: App-specific resources not available until REST API CRD support
         if ($app == 'builtin') {
-            // Not for this module
+            // Not for this module - builtin resources handled by other importers
             return false;
         }
 
-        // Is that app registered?
-        if (!in_array($app, $apps)) {
-            $this->cli->writeln("App $app is not registered.");
-            return false;
-        }
-        try {
-            $api = $this->dependencies->getApplicationResources($app);
-            $resources = $api->getTypeList();
-        } catch (\Exception $e) {
-            $this->cli->writeln($e->getMessage());
-            $this->cli->writeln("Not importing $resource");
-        }
-        // Is that resource defined?
-        if (!in_array($resource, $resources)) {
-            $this->cli->writeln("Resource $resource not defined in $app");
-            return false;
-        }
-        // Does the app handle the query command?
-        if (!method_exists($api, 'importType')) {
-            $this->cli->writeln("query not defined in $app");
-            return false;
-        }
-        $items = $tree['apps'][$app]['resources'][$resource]['items'];
-        try {
-            $response = $api->importType($resource, $items);
-        } catch (\Exception $e) {
-            $this->cli->writeln("Resource $resource not imported to $app");
-            $this->cli->writeln($e->getMessage());
-            return false;
-        }
-        $this->cli->message("Resource $resource imported to $app", 'cli.success');
-        return true;
+        // App-specific resources (turba/contacts, kronolith/events, etc.)
+        // require REST API CRD operations which are not yet implemented
+        $this->cli->message(
+            "UNSUPPORTED: App resource import for '$app/$resource' requires REST API CRD support.",
+            'cli.warning'
+        );
+        $this->cli->message(
+            'App-specific resource import is deferred until Admin REST API CRD operations are implemented.',
+            'cli.warning'
+        );
+
+        return false;
     }
 }
