@@ -17,6 +17,7 @@ use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
+use Horde_Cli;
 
 /**
  * Configure command module - setup and configure Horde subsystems
@@ -31,7 +32,7 @@ class Configure implements Module, ModuleUsage
     use ModuleTrait;
     use HasModulesTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
 
     public function __construct(Injector $dependencies)
     {
@@ -81,7 +82,7 @@ class Configure implements Module, ModuleUsage
 
         // Try to delegate to submodules
         $handled = false;
-        list($myArgs, $moduleArgs) = $this->handleCommandline($argv);
+        [$myArgs, $moduleArgs] = $this->handleCommandline($argv);
         foreach ($this->listModules() as $module) {
             $handled |= $module->handle($moduleArgs);
         }
@@ -107,6 +108,9 @@ class Configure implements Module, ModuleUsage
         $this->cli->writeln('       hordectl config SUBCOMMAND [OPTIONS]');
         $this->cli->writeln();
         $this->cli->writeln('Configure Horde subsystems and settings.');
+        $this->cli->writeln();
+        $this->cli->writeln($this->cli->yellow('Note: Configure commands require a local target with filesystem access.'));
+        $this->cli->writeln('      Remote targets cannot be configured via hordectl.');
         $this->cli->writeln();
         $this->cli->writeln('Available subcommands:');
 

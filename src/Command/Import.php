@@ -10,6 +10,7 @@ use Horde\Yaml\Yaml;
 use Horde\Injector\Injector;
 use Horde\Argv\Option;
 use Horde\Argv\Parser;
+use Horde_Cli;
 
 /**
  *
@@ -20,7 +21,7 @@ class Import implements Module, ModuleUsage
     use ModuleTrait;
     use HasModulesTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
 
     public function __construct(Injector $dependencies)
     {
@@ -47,9 +48,9 @@ class Import implements Module, ModuleUsage
                         'action' => 'store',
                         'type' => 'string',
                         'dest' => 'filename',
-                        'help'   => 'The Yaml file to read'
+                        'help'   => 'The Yaml file to read',
                     ]
-                )
+                ),
             ];
     }
 
@@ -84,7 +85,7 @@ class Import implements Module, ModuleUsage
         $parser->addOption(new Option('-f', '--filename', ['dest' => 'filename']));
         $parser->allowInterspersedArgs = false;
 
-        list($myArgs, $moduleArgs) = $this->handleCommandline($argv);
+        [$myArgs, $moduleArgs] = $this->handleCommandline($argv);
         // identify yaml file or input stream
         // TODO: Handle "-" or console input redirects
         if (!$myArgs->filename) {

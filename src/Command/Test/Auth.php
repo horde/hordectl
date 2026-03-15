@@ -3,19 +3,28 @@
 namespace Horde\Hordectl\Command\Test;
 
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Exception;
+use Horde_Cli;
 
 /**
- * Test authentication system
+ * Test auth via REST API
  */
 class Auth implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
+    use HealthCheckDisplayTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    protected AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
@@ -25,83 +34,28 @@ class Auth implements Module, ModuleUsage
         $this->parser->allowInterspersedArgs = false;
     }
 
-    /**
-     * Handle the test command
-     *
-     * @param array $argv
-     * @return bool
-     */
     public function handle(array $argv = [])
     {
-        if (count($argv) < 1) {
-            return false;
-        }
-        if ($argv[0] != 'auth') {
+        if (count($argv) < 1 || $argv[0] != 'auth') {
             return false;
         }
 
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
+
         $this->cli->writeln();
-        $this->cli->writeln('Authentication System Test');
-        $this->cli->writeln('==========================');
+        $this->cli->writeln('Authentication Test');
+        $this->cli->writeln(str_repeat('=', strlen('Authentication Test')));
         $this->cli->writeln();
 
         try {
-            $conf = $GLOBALS['conf'] ?? null;
-            if (!isset($conf['auth']['driver'])) {
-                $this->cli->message('Authentication driver not configured in conf.php', 'cli.error');
-                return true;
-            }
-
-            $authDriver = $conf['auth']['driver'];
-            $authAdmins = $conf['auth']['admins'] ?? [];
-            $adminList = is_array($authAdmins) ? implode(', ', $authAdmins) : $authAdmins;
-
-            $this->cli->message('Configured driver: ' . $authDriver, 'cli.message');
-            if (!empty($adminList)) {
-                $this->cli->message('Administrators: ' . $adminList, 'cli.message');
-            }
-
-            if (isset($GLOBALS['injector'])) {
-                $auth = $GLOBALS['injector']->getInstance('Horde_Core_Factory_Auth')->create();
-                if ($auth) {
-                    $authClass = get_class($auth);
-                    $this->cli->message('Active driver class: ' . $authClass, 'cli.message');
-
-                    // Check if this is the Application wrapper and introspect the wrapped driver
-                    if ($authClass === 'Horde_Core_Auth_Application') {
-                        try {
-                            $reflection = new \ReflectionClass($auth);
-                            if ($reflection->hasProperty('_base')) {
-                                $baseProperty = $reflection->getProperty('_base');
-                                $baseProperty->setAccessible(true);
-                                $baseDriver = $baseProperty->getValue($auth);
-
-                                if ($baseDriver !== null) {
-                                    $baseClass = get_class($baseDriver);
-                                    $this->cli->message(
-                                        'Wrapped backend: ' . $baseClass,
-                                        'cli.message'
-                                    );
-                                }
-                            }
-                        } catch (\ReflectionException $e) {
-                            // Reflection failed, just show the wrapper class
-                        }
-                    }
-
-                    $this->cli->writeln();
-                    $this->cli->message('Authentication system: OK', 'cli.success');
-                } else {
-                    $this->cli->message('Auth factory returned null', 'cli.error');
-                }
-            } else {
-                $this->cli->message('Injector not available', 'cli.error');
-            }
-        } catch (\Exception $e) {
-            $this->cli->message('Error: ' . $e->getMessage(), 'cli.error');
+            $result = $this->apiClient->checkHealth('auth');
+            $this->displayHealthCheck($result);
+            return true;
+        } catch (Exception $e) {
+            $this->displayApiError($e);
+            return true;
         }
-
-        $this->cli->writeln();
-        return true;
     }
 }

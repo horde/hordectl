@@ -1,21 +1,33 @@
 <?php
 
 namespace Horde\Hordectl\Command\Query;
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use Horde\Injector\Injector;
+
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Injector\Injector;
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Exception;
+use Horde_Cli;
+use RuntimeException;
+
 /**
+ * Query command module for Horde permissions via Admin REST API
  *
- * Query command module for Horde permissions
+ * Uses modern AdminApiClient instead of legacy PermsRepo.
  */
-class Permission
-implements Module, ModuleUsage
+class Permission implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    private AdminApiClient $apiClient;
+
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
@@ -27,7 +39,11 @@ implements Module, ModuleUsage
 
     /**
      * Decide if this module handles the commandline
-     * 
+     *
+     * Usage:
+     *   hordectl query permission              - Export all permissions
+     *   hordectl query permission <name>       - Export specific permission
+     *
      * @params array $globalOpts  Commandline Options already parsed by previous levels
      * @params array $argv        The arguments for the parser to digest
      */
@@ -40,12 +56,62 @@ implements Module, ModuleUsage
         if ($argv[0] != 'permission') {
             return false;
         }
-        // TODO: accept some filters on which permissions to export and which details to export
+
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
+
         $writer = $this->dependencies->getInstance('\Horde\Hordectl\YamlWriter');
 
-        $exporter = $this->dependencies->getInstance('PermsRepo');
-        $items = $exporter->export();
-        $writer->addResource('builtin', 'permission', $items);
+        try {
+            // Check if a specific permission name was provided
+            if (isset($argv[1]) && !empty($argv[1])) {
+                $name = $argv[1];
+
+                // Get single permission via API
+                $permission = $this->apiClient->getPermission($name);
+
+                // Convert to YAML format
+                $items = [$permission->toArray()];
+
+                $writer->addResource('builtin', 'permission', $items);
+            } else {
+                // Export all permissions
+                $permissionList = $this->apiClient->listPermissions();
+
+                $items = [];
+                foreach ($permissionList->toArray() as $permission) {
+                    $items[] = $permission->toArray();
+                }
+
+                $writer->addResource('builtin', 'permission', $items);
+            }
+        } catch (RuntimeException $e) {
+            // Check if it's a 404 error (permission not found)
+            if (strpos($e->getMessage(), 'PERMISSION_NOT_FOUND') !== false) {
+                $this->cli->message(
+                    sprintf('Permission "%s" not found', $argv[1] ?? 'unknown'),
+                    'cli.error'
+                );
+            } else {
+                $this->cli->message(
+                    sprintf('Error querying permissions: %s', $e->getMessage()),
+                    'cli.error'
+                );
+                // Re-throw for debugging
+                throw $e;
+            }
+            return false;
+        } catch (Exception $e) {
+            $this->cli->message(
+                sprintf('Error querying permissions: %s', $e->getMessage()),
+                'cli.error'
+            );
+            // Re-throw for debugging
+            throw $e;
+            return false;
+        }
+
         return true;
     }
 }

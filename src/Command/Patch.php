@@ -1,23 +1,33 @@
 <?php
 
 namespace Horde\Hordectl\Command;
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use \Horde\Hordectl\HasModulesTrait;
-use Horde\Injector\Injector;
+
 use Horde\Argv\Option;
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
+use Horde\Hordectl\HasModulesTrait;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Injector\Injector;
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Exception;
+use Horde_Cli;
+use RuntimeException;
+
 /**
  *
  * Command module to manipulate single resource entities
  */
-class Patch
-implements Module, ModuleUsage
+class Patch implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
@@ -39,17 +49,17 @@ implements Module, ModuleUsage
                         'action' => 'store',
                         'type' => 'string',
                         'dest' => 'filename',
-                        'help'   => 'The Yaml file to read'
+                        'help'   => 'The Yaml file to read',
                     ]
-                )
+                ),
             ];
     }
 
     /**
      * Decide if this module handles the commandline
-     * 
+     *
      * These will be merged and written to Yaml output format
-     * 
+     *
      * @params array $argv        The arguments for the parser to digest
      */
     public function handle(array $argv = [])
@@ -61,61 +71,52 @@ implements Module, ModuleUsage
         if ($argv[0] != 'patch') {
             return false;
         }
-    
+
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
+
         $parser = new Parser();
         $parser->allowInterspersedArgs = false;
 
-        list($myArgs, $moduleArgs) = $this->handleCommandline($argv);
+        [$myArgs, $moduleArgs] = $this->handleCommandline($argv);
         if (count($moduleArgs) >= 3 && $moduleArgs[0] == 'user') {
             $username = $moduleArgs[1];
             $password = $moduleArgs[2];
 
             try {
-                $auth = $this->dependencies->getInstance('\Horde_Auth_Base');
-                $driverName = get_class($auth);
-
-                // Check if this is the Application wrapper and introspect the wrapped driver
-                if ($driverName === 'Horde_Core_Auth_Application') {
-                    try {
-                        $reflection = new \ReflectionClass($auth);
-                        if ($reflection->hasProperty('_base')) {
-                            $baseProperty = $reflection->getProperty('_base');
-                            $baseProperty->setAccessible(true);
-                            $baseDriver = $baseProperty->getValue($auth);
-
-                            if ($baseDriver !== null) {
-                                $baseClass = get_class($baseDriver);
-                                $driverName = "Horde_Core_Auth_Application wrapping {$baseClass}";
-                            }
-                        }
-                    } catch (\ReflectionException $e) {
-                        // Reflection failed, just show the wrapper class
-                    }
+                // Check if user exists via REST API
+                $exists = false;
+                try {
+                    $this->apiClient->getUser($username);
+                    $exists = true;
+                } catch (RuntimeException $e) {
+                    // User doesn't exist
+                    $exists = false;
                 }
 
-                if ($auth->exists($username)) {
+                if ($exists) {
                     $this->cli->message(
-                        sprintf('Updating password for user "%s" (driver: %s)', $username, $driverName),
+                        sprintf('Updating password for user "%s"', $username),
                         'cli.message'
                     );
-                    $auth->updateUser($username, $username, ['password' => $password]);
+                    $this->apiClient->patchUserPassword($username, $password);
                     $this->cli->message(
                         sprintf('Successfully updated password for user "%s"', $username),
                         'cli.success'
                     );
                 } else {
                     $this->cli->message(
-                        sprintf('Creating new user "%s" (driver: %s)', $username, $driverName),
-                        'cli.message'
+                        'Error: User creation not supported via REST API. Use import command instead.',
+                        'cli.error'
                     );
-                    $auth->addUser($username, ['password' => $password]);
                     $this->cli->message(
-                        sprintf('Successfully created user "%s"', $username),
-                        'cli.success'
+                        sprintf('User "%s" does not exist and cannot be created via patch command', $username),
+                        'cli.error'
                     );
                 }
                 return true;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->cli->message(
                     sprintf('Error: %s', $e->getMessage()),
                     'cli.error'
@@ -131,7 +132,9 @@ implements Module, ModuleUsage
         $this->cli->writeln('Patch (modify) individual Horde resources.');
         $this->cli->writeln();
         $this->cli->writeln('Available subcommands:');
-        $this->cli->writeln('  user    Create or update a user password');
+        $this->cli->writeln('  user    Update an existing user password (via Admin REST API)');
+        $this->cli->writeln();
+        $this->cli->writeln('NOTE: User creation not supported. Use import command.');
         $this->cli->writeln();
         return false;
     }
@@ -148,17 +151,17 @@ implements Module, ModuleUsage
 Patch (modify) individual Horde resources.
 
 Available subcommands:
-    user    Create or update a user password
+    user    Update an existing user password (via Admin REST API)
 
 EXAMPLES
-    # Create new user
-    hordectl patch user newuser secretpassword
-
     # Update existing user password
     hordectl patch user admin newpassword
 
-The command shows which authentication driver is being used and reports
-success or failure with clear error messages.
+NOTE: User creation is not supported via the patch command.
+      Use the import command to create new users.
+
+The command uses the Admin REST API and reports success or failure
+with clear error messages.
 ';
     }
 
@@ -169,6 +172,6 @@ success or failure with clear error messages.
      */
     public function getSummary()
     {
-        return 'Modify individual resources (patch user <username> <password>)';
+        return 'Modify individual resources via Admin REST API (requires API endpoint)';
     }
 }

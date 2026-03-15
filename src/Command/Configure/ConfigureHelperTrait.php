@@ -11,6 +11,13 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command\Configure;
 
+use Horde\Hordectl\ConfigManager;
+use Horde\Hordectl\Exception\NoCurrentTargetException;
+use Horde\Hordectl\Exception\TargetNotFoundException;
+use Horde\Hordectl\Target;
+use Horde\Hordectl\TargetResolver;
+use Exception;
+
 /**
  * Common helper methods for configure subcommands
  *
@@ -21,6 +28,64 @@ namespace Horde\Hordectl\Command\Configure;
  */
 trait ConfigureHelperTrait
 {
+    /**
+     * Require filesystem commands capability for configure operations
+     *
+     * Configure commands need local filesystem access to modify conf.php.
+     *
+     * @param ConfigManager|null $config Optional config for testing
+     * @return Target Current target with filesystem capability
+     */
+    protected function requireConfigureCapability(?ConfigManager $config = null): Target
+    {
+        $config ??= new ConfigManager();
+        $resolver = new TargetResolver();
+
+        // Check for --target flag override (stored in dependencies)
+        $target = null;
+        if (isset($this->dependencies)) {
+            try {
+                $targetOverride = $this->dependencies->getInstance('hordectl.target_override');
+                if (!empty($targetOverride)) {
+                    $target = $resolver->getTarget($config, $targetOverride);
+                }
+            } catch (Exception $e) {
+                // No override set, continue to get current target
+            }
+        }
+
+        // No override, get current target
+        if ($target === null) {
+            try {
+                $target = $resolver->getCurrentTarget($config);
+            } catch (NoCurrentTargetException $e) {
+                $this->cli->fatal(
+                    "No active target configured.\n"
+                    . "Run 'hordectl target list' to see available targets or 'hordectl target add' to create one."
+                );
+            } catch (TargetNotFoundException $e) {
+                $this->cli->fatal($e->getMessage());
+            }
+        }
+
+        if (!$target->supportsFilesystemCommands()) {
+            $this->cli->fatal(
+                "Configure commands require a local target with filesystem access.\n"
+                . "\n"
+                . "Current target: {$target->name} ({$target->type->value})\n"
+                . "Location: {$target->getLocationString()}\n"
+                . "\n"
+                . "Remote targets cannot execute configure commands because hordectl\n"
+                . "has no direct access to the remote server's filesystem to modify conf.php.\n"
+                . "\n"
+                . "Solution: Switch to a local target:\n"
+                . "  hordectl target list     # Show available targets\n"
+                . "  hordectl target use <name>  # Switch to local target"
+            );
+        }
+
+        return $target;
+    }
     /**
      * Prompt for boolean value
      *

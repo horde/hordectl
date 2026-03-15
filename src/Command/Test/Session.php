@@ -3,19 +3,28 @@
 namespace Horde\Hordectl\Command\Test;
 
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Exception;
+use Horde_Cli;
 
 /**
- * Test session handler configuration
+ * Test session handler via REST API
  */
 class Session implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
+    use HealthCheckDisplayTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    protected AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
@@ -25,20 +34,15 @@ class Session implements Module, ModuleUsage
         $this->parser->allowInterspersedArgs = false;
     }
 
-    /**
-     * Handle the test command
-     *
-     * @param array $argv
-     * @return bool
-     */
     public function handle(array $argv = [])
     {
-        if (count($argv) < 1) {
+        if (count($argv) < 1 || $argv[0] != 'session') {
             return false;
         }
-        if ($argv[0] != 'session') {
-            return false;
-        }
+
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
 
         $this->cli->writeln();
         $this->cli->writeln('Session Handler Test');
@@ -46,82 +50,12 @@ class Session implements Module, ModuleUsage
         $this->cli->writeln();
 
         try {
-            $conf = $GLOBALS['conf'] ?? null;
-            $sessionConfigured = false;
-            $configuredType = 'not configured';
-            $configuredHashtable = null;
-
-            // Check session handler configuration
-            if (isset($conf['sessionhandler']['type'])) {
-                $configuredType = $conf['sessionhandler']['type'];
-                $sessionConfigured = true;
-                if (isset($conf['sessionhandler']['hashtable'])) {
-                    $configuredHashtable = $conf['sessionhandler']['hashtable'];
-                }
-            }
-
-            $this->cli->message('Configured type: ' . $configuredType, 'cli.message');
-            if ($configuredHashtable !== null) {
-                $this->cli->message('Hashtable mode: ' . ($configuredHashtable ? 'yes' : 'no'), 'cli.message');
-            }
-
-            if (!isset($GLOBALS['session'])) {
-                $this->cli->message('Session not available in global scope (CLI mode)', 'cli.warning');
-                return true;
-            }
-
-            $session = $GLOBALS['session'];
-            if (!$session || !$session->sessionHandler) {
-                $this->cli->message('Session handler not initialized (CLI mode)', 'cli.warning');
-                return true;
-            }
-
-            $actualHandler = get_class($session->sessionHandler);
-            $this->cli->message('Active handler class: ' . $actualHandler, 'cli.message');
-
-            // Check if this is Horde_SessionHandler wrapper and introspect the storage backend
-            if ($actualHandler === 'Horde_SessionHandler') {
-                try {
-                    $reflection = new \ReflectionClass($session->sessionHandler);
-                    if ($reflection->hasProperty('_storage')) {
-                        $storageProperty = $reflection->getProperty('_storage');
-                        $storageProperty->setAccessible(true);
-                        $storageBackend = $storageProperty->getValue($session->sessionHandler);
-
-                        if ($storageBackend !== null) {
-                            $storageClass = get_class($storageBackend);
-                            $this->cli->message('Storage backend: ' . $storageClass, 'cli.message');
-                        }
-                    }
-                } catch (\ReflectionException $e) {
-                    // Reflection failed
-                }
-            }
-
-            // Check cookie configuration
-            if (isset($conf['cookie']['domain'])) {
-                $cookieDomain = $conf['cookie']['domain'];
-                $serverName = $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? 'unknown';
-
-                $this->cli->message('Cookie domain: ' . ($cookieDomain ?: '(empty)'), 'cli.message');
-
-                // Warn if server name has no dots but cookie domain is set
-                if (strpos($serverName, '.') === false && $cookieDomain !== '') {
-                    $this->cli->message(
-                        'WARNING: Server name "' . $serverName . '" has no dots but cookie domain is set. Sessions may not work.',
-                        'cli.warning'
-                    );
-                    $this->cli->message('Consider setting: $conf[\'cookie\'][\'domain\'] = \'\';', 'cli.message');
-                }
-            }
-
-            $this->cli->writeln();
-            $this->cli->message('Session handler: OK', 'cli.success');
-        } catch (\Exception $e) {
-            $this->cli->message('Error: ' . $e->getMessage(), 'cli.error');
+            $result = $this->apiClient->checkHealth('session');
+            $this->displayHealthCheck($result);
+            return true;
+        } catch (Exception $e) {
+            $this->displayApiError($e);
+            return true;
         }
-
-        $this->cli->writeln();
-        return true;
     }
 }

@@ -9,6 +9,7 @@ use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde_Cli;
 
 /**
  * Test command module implements CLI subsystem testing
@@ -20,7 +21,7 @@ class Test implements Module, ModuleUsage
     use ModuleTrait;
     use HasModulesTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
 
     public function __construct(Injector $dependencies)
     {
@@ -32,7 +33,8 @@ class Test implements Module, ModuleUsage
         $this->_initModules(
             $dependencies,
             '\Horde\Hordectl\Command\Test',
-            dirname(__FILE__) . '/Test'
+            dirname(__FILE__) . '/Test',
+            ['HealthCheckDisplayTrait']  // Exclude trait from module loading
         );
     }
 
@@ -51,7 +53,7 @@ class Test implements Module, ModuleUsage
             return false;
         }
 
-        list($myArgs, $moduleArgs) = $this->handleCommandline($argv);
+        [$myArgs, $moduleArgs] = $this->handleCommandline($argv);
 
         // Show help if no subcommand provided
         if (empty($moduleArgs)) {

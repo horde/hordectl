@@ -20,6 +20,8 @@ use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
+use Exception;
+use Horde_Cli;
 
 /**
  * Configure LDAP connection and settings
@@ -41,7 +43,7 @@ class Ldap implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -61,7 +63,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'LDAP server hostname or IP'
+                    'help' => 'LDAP server hostname or IP',
                 ]
             ),
             new Option(
@@ -69,7 +71,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'LDAP server port (default: 389 for LDAP, 636 for LDAPS)'
+                    'help' => 'LDAP server port (default: 389 for LDAP, 636 for LDAPS)',
                 ]
             ),
             new Option(
@@ -77,7 +79,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Use TLS encryption (true/false)'
+                    'help' => 'Use TLS encryption (true/false)',
                 ]
             ),
             new Option(
@@ -85,7 +87,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'LDAP protocol version (2 or 3)'
+                    'help' => 'LDAP protocol version (2 or 3)',
                 ]
             ),
             new Option(
@@ -93,7 +95,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'LDAP base DN for searches'
+                    'help' => 'LDAP base DN for searches',
                 ]
             ),
             new Option(
@@ -101,7 +103,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Bind DN for authentication'
+                    'help' => 'Bind DN for authentication',
                 ]
             ),
             new Option(
@@ -109,7 +111,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Bind password (warning: visible in process list)'
+                    'help' => 'Bind password (warning: visible in process list)',
                 ]
             ),
             new Option(
@@ -117,7 +119,7 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'LDAP attribute for username (default: uid)'
+                    'help' => 'LDAP attribute for username (default: uid)',
                 ]
             ),
             new Option(
@@ -125,14 +127,14 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'LDAP search filter'
+                    'help' => 'LDAP search filter',
                 ]
             ),
             new Option(
                 '--test',
                 [
                     'action' => 'store_true',
-                    'help' => 'Test LDAP connection and bind'
+                    'help' => 'Test LDAP connection and bind',
                 ]
             ),
             new Option(
@@ -140,21 +142,21 @@ class Ldap implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Test search for user (requires --test)'
+                    'help' => 'Test search for user (requires --test)',
                 ]
             ),
             new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
-                    'help' => 'Interactive mode with prompts'
+                    'help' => 'Interactive mode with prompts',
                 ]
             ),
             new Option(
                 '--show',
                 [
                     'action' => 'store_true',
-                    'help' => 'Show current LDAP configuration'
+                    'help' => 'Show current LDAP configuration',
                 ]
             ),
         ];
@@ -173,13 +175,16 @@ class Ldap implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireConfigureCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Create ConfigHelper
@@ -236,9 +241,9 @@ class Ldap implements Module, ModuleUsage
      */
     private function hasConfigOptions(object $opts): bool
     {
-        return isset($opts->host) || isset($opts->port) || isset($opts->tls) ||
-               isset($opts->version) || isset($opts->basedn) || isset($opts->binddn) ||
-               isset($opts->bindpw) || isset($opts->uid_attr) || isset($opts->filter);
+        return isset($opts->host) || isset($opts->port) || isset($opts->tls)
+               || isset($opts->version) || isset($opts->basedn) || isset($opts->binddn)
+               || isset($opts->bindpw) || isset($opts->uid_attr) || isset($opts->filter);
     }
 
     /**
@@ -265,9 +270,9 @@ class Ldap implements Module, ModuleUsage
 
         $port = $this->cli->prompt(
             'LDAP server port (389 for LDAP, 636 for LDAPS):',
-            (string)($helper->getValue('ldap.port') ?? 389)
+            (string) ($helper->getValue('ldap.port') ?? 389)
         );
-        $helper->setValue('ldap.port', (int)$port);
+        $helper->setValue('ldap.port', (int) $port);
 
         $tls = $this->promptBoolean(
             'Use TLS encryption?',
@@ -277,9 +282,9 @@ class Ldap implements Module, ModuleUsage
 
         $version = $this->cli->prompt(
             'LDAP protocol version (2 or 3):',
-            (string)($helper->getValue('ldap.version') ?? 3)
+            (string) ($helper->getValue('ldap.version') ?? 3)
         );
-        $helper->setValue('ldap.version', (int)$version);
+        $helper->setValue('ldap.version', (int) $version);
 
         $this->cli->writeln();
         $this->cli->writeln('LDAP Search Configuration:');
@@ -543,7 +548,7 @@ class Ldap implements Module, ModuleUsage
 
             ldap_unbind($conn);
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->cli->message('✗ LDAP test failed', 'cli.error');
             $this->cli->writeln('  Error: ' . $e->getMessage());
             return false;

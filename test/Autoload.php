@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Setup autoloading for the tests.
  *
@@ -15,7 +16,7 @@
 
 // Add PSR-4 namespace mapping for Horde\Hordectl to the Horde test autoloader
 if (class_exists('Horde\Test\Autoload')) {
-    \Horde\Test\Autoload::addPrefix('Horde/Hordectl', dirname(__DIR__) . '/src');
+    Horde\Test\Autoload::addPrefix('Horde/Hordectl', dirname(__DIR__) . '/src');
 }
 
 // Add vendor lib directories to include path for old-style Horde_* classes

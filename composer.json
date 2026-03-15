@@ -22,7 +22,8 @@
         "horde/argv": "^3 || dev-FRAMEWORK_6_0",
         "horde/yaml": "^3 || dev-FRAMEWORK_6_0",
         "horde/group": "^3 || dev-FRAMEWORK_6_0",
-        "horde/phpconfigfile": "^1 || ^0 || dev-FRAMEWORK_6_0"
+        "horde/phpconfigfile": "^1 || ^0 || dev-FRAMEWORK_6_0",
+        "horde/http": "^3 || dev-FRAMEWORK_6_0"
     },
     "require-dev": {
         "horde/test": "^3 || dev-FRAMEWORK_6_0",
@@ -49,5 +50,6 @@
         "branch-alias": {
             "dev-FRAMEWORK_6_0": "1.x-dev"
         }
-    }
+    },
+    "minimum-stability": "dev"
 }

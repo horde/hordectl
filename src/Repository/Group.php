@@ -1,8 +1,11 @@
 <?php
+
 namespace Horde\Hordectl\Repository;
-use \Horde_Group_Base as GroupDriver;
+
+use Horde_Group_Base as GroupDriver;
+
 /**
- * Resource Group handles querying and formatting 
+ * Resource Group handles querying and formatting
  * group representations
  */
 class Group
@@ -18,7 +21,7 @@ class Group
      *
      * We don't export IDs as these don't reproduce well
      * TODO: handle email
-     * 
+     *
      */
     public function export()
     {
@@ -26,7 +29,7 @@ class Group
         foreach ($this->_driver->listAll() as $groupId => $groupName) {
             $items[] = [
                 'groupName' => $groupName,
-                'groupMembers' => $this->_driver->listUsers($groupId)
+                'groupMembers' => $this->_driver->listUsers($groupId),
             ];
         }
         return $items;
@@ -58,16 +61,16 @@ class Group
 
     /**
      * Resolve group names to Ids
-     * 
+     *
      * In yaml, we generally reference groups by name
      * We don't have any means to import groups by a specific gid
-     * 
+     *
      * However, most resources relate to groups by gid
      * Gid are also not really portable over backends
-     * 
+     *
      * Sql gids are numeric, Ldap gids are strings
      */
-    public function getGroupIdByName(string $name) : string
+    public function getGroupIdByName(string $name): string
     {
         $id = '';
         foreach ($this->_driver->search($name) as $gid => $gname) {
@@ -80,12 +83,12 @@ class Group
         return (string) $id;
     }
 
-    public function exists(string $gid) : bool
+    public function exists(string $gid): bool
     {
         return $this->_driver->exists($gid);
     }
 
-    public function getGroupNameById(string $gid) : string
+    public function getGroupNameById(string $gid): string
     {
         return $this->_driver->getName($gid);
     }

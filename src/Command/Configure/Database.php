@@ -13,15 +13,17 @@ namespace Horde\Hordectl\Command\Configure;
 
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Command\Configure\ConfigureHelperTrait;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use PDO;
 use PDOException;
 use RuntimeException;
+use Horde_Cli;
 
 /**
  * Configure database settings
@@ -41,8 +43,9 @@ use RuntimeException;
 class Database implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use ConfigureHelperTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -67,7 +70,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Database type (mysql, pgsql, sqlite)'
+                    'help' => 'Database type (mysql, pgsql, sqlite)',
                 ]
             ),
             new Option(
@@ -75,7 +78,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Database host'
+                    'help' => 'Database host',
                 ]
             ),
             new Option(
@@ -83,7 +86,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Database port'
+                    'help' => 'Database port',
                 ]
             ),
             new Option(
@@ -91,7 +94,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Database username'
+                    'help' => 'Database username',
                 ]
             ),
             new Option(
@@ -99,7 +102,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Database password (warning: visible in process list)'
+                    'help' => 'Database password (warning: visible in process list)',
                 ]
             ),
             new Option(
@@ -107,7 +110,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Database name'
+                    'help' => 'Database name',
                 ]
             ),
             new Option(
@@ -115,7 +118,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Character set (default: utf8mb4)'
+                    'help' => 'Character set (default: utf8mb4)',
                 ]
             ),
             new Option(
@@ -123,7 +126,7 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Connection protocol (tcp, unix, etc.)'
+                    'help' => 'Connection protocol (tcp, unix, etc.)',
                 ]
             ),
             new Option(
@@ -131,28 +134,28 @@ class Database implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Unix socket path (alternative to host/port)'
+                    'help' => 'Unix socket path (alternative to host/port)',
                 ]
             ),
             new Option(
                 '--test',
                 [
                     'action' => 'store_true',
-                    'help' => 'Test database connection (with current or provided settings)'
+                    'help' => 'Test database connection (with current or provided settings)',
                 ]
             ),
             new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
-                    'help' => 'Interactive mode with prompts'
+                    'help' => 'Interactive mode with prompts',
                 ]
             ),
             new Option(
                 '--show',
                 [
                     'action' => 'store_true',
-                    'help' => 'Show current database configuration'
+                    'help' => 'Show current database configuration',
                 ]
             ),
         ];
@@ -171,13 +174,16 @@ class Database implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireConfigureCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Create ConfigHelper
@@ -234,9 +240,9 @@ class Database implements Module, ModuleUsage
      */
     private function hasConfigOptions(object $opts): bool
     {
-        return isset($opts->type) || isset($opts->host) || isset($opts->port) ||
-               isset($opts->username) || isset($opts->password) || isset($opts->database) ||
-               isset($opts->charset) || isset($opts->protocol) || isset($opts->socket);
+        return isset($opts->type) || isset($opts->host) || isset($opts->port)
+               || isset($opts->username) || isset($opts->password) || isset($opts->database)
+               || isset($opts->charset) || isset($opts->protocol) || isset($opts->socket);
     }
 
     /**
@@ -292,10 +298,10 @@ class Database implements Module, ModuleUsage
 
             $port = $this->cli->prompt(
                 'Database port (leave empty for default):',
-                (string)($helper->getValue('sql.port') ?? '')
+                (string) ($helper->getValue('sql.port') ?? '')
             );
             if ($port !== '') {
-                $helper->setValue('sql.port', (int)$port);
+                $helper->setValue('sql.port', (int) $port);
             } else {
                 $helper->unsetValue('sql.port');
             }

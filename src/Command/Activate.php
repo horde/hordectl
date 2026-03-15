@@ -13,11 +13,13 @@ namespace Horde\Hordectl\Command;
 
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\ConfigManager;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use RuntimeException;
+use Horde_Cli;
 
 /**
  * Activate Horde installation
@@ -34,8 +36,9 @@ use RuntimeException;
 class Activate implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -54,7 +57,7 @@ class Activate implements Module, ModuleUsage
                 '--force',
                 [
                     'action' => 'store_true',
-                    'help' => 'Overwrite existing conf.php'
+                    'help' => 'Overwrite existing conf.php',
                 ]
             ),
         ];
@@ -73,13 +76,16 @@ class Activate implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireFilesystemCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Paths
@@ -102,7 +108,7 @@ class Activate implements Module, ModuleUsage
 
             // Create target directory if needed
             if (!is_dir($targetDir)) {
-                if (!mkdir($targetDir, 0755, true)) {
+                if (!mkdir($targetDir, 0o755, true)) {
                     $this->cli->fatal("Failed to create directory: $targetDir");
                 }
                 $this->cli->message("Created directory: $targetDir", 'cli.success');
@@ -114,7 +120,7 @@ class Activate implements Module, ModuleUsage
             }
 
             // Set permissions
-            chmod($targetFile, 0600);
+            chmod($targetFile, 0o600);
 
             $this->cli->writeln();
             $this->cli->message('✓ Configuration file created', 'cli.success');
@@ -179,6 +185,9 @@ Activate a Horde installation by copying default configuration files.
 This command copies conf.php.dist from vendor/horde/horde/config to
 var/config/horde/conf.php, initializing your Horde installation.
 
+Note: This command requires a local target with filesystem access.
+      Remote targets cannot be activated via hordectl.
+
 OPTIONS
     --force
         Overwrite existing conf.php if it already exists
@@ -194,7 +203,7 @@ EXAMPLES
 
     public function getSummary()
     {
-        return 'Activate Horde installation by copying default configuration';
+        return 'Activate Horde installation by copying default configuration (local only)';
     }
 
     /**
@@ -230,7 +239,7 @@ EXAMPLES
         }
 
         // Try to find in PATH
-        $which = trim((string)shell_exec('which composer 2>/dev/null'));
+        $which = trim((string) shell_exec('which composer 2>/dev/null'));
         if ($which && is_executable($which)) {
             return $which;
         }

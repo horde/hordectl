@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 /**
  * Test the HordectlModuleTrait
+ * @coversNothing
  */
 #[AllowMockObjectsWithoutExpectations]
 class HordectlModuleTraitTest extends TestCase
@@ -201,7 +202,7 @@ class HordectlModuleTraitTest extends TestCase
             public function getBaseOptions()
             {
                 return [
-                    new Option('-t', '--test', ['dest' => 'test'])
+                    new Option('-t', '--test', ['dest' => 'test']),
                 ];
             }
 

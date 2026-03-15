@@ -3,19 +3,28 @@
 namespace Horde\Hordectl\Command\Test;
 
 use Horde\Argv\Parser;
+use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Exception;
+use Horde_Cli;
 
 /**
- * Run all subsystem tests
+ * Test all subsystems via REST API
  */
 class All implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
+    use AdminApiClientTrait;
+    use HealthCheckDisplayTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
+    protected AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
@@ -25,43 +34,50 @@ class All implements Module, ModuleUsage
         $this->parser->allowInterspersedArgs = false;
     }
 
-    /**
-     * Handle the test command
-     *
-     * @param array $argv
-     * @return bool
-     */
     public function handle(array $argv = [])
     {
-        if (count($argv) < 1) {
+        if (count($argv) < 1 || $argv[0] != 'all') {
             return false;
         }
-        if ($argv[0] != 'all') {
-            return false;
-        }
+
+        // Check target capability and create API client
+        $target = $this->requireApiCapability();
+        $this->apiClient = $this->createApiClientFromTarget($target);
 
         $this->cli->writeln();
-        $this->cli->writeln('========================================');
-        $this->cli->writeln('Horde Subsystem Tests');
-        $this->cli->writeln('========================================');
+        $this->cli->writeln('All Subsystems Test');
+        $this->cli->writeln('===================');
+        $this->cli->writeln();
 
-        // Run all tests by calling each test with its specific name (not 'all')
-        $tests = ['db', 'cache', 'session', 'logger', 'auth', 'jwt'];
+        try {
+            $results = $this->apiClient->checkAllHealth();
 
-        foreach ($tests as $test) {
-            // Create test instance and run it with its specific test name
-            $className = 'Horde\\Hordectl\\Command\\Test\\' . ucfirst($test);
-            if (class_exists($className)) {
-                $testInstance = new $className($this->dependencies);
-                $testInstance->handle([$test]);  // Pass the specific test name, not 'all'
+            $subsystems = ['db' => 'Database', 'cache' => 'Cache', 'session' => 'Session',
+                'logger' => 'Logger', 'auth' => 'Auth', 'jwt' => 'JWT'];
+
+            foreach ($subsystems as $key => $title) {
+                if (isset($results[$key])) {
+                    $result = $results[$key];
+                    $this->cli->writeln($title . ':');
+                    $this->cli->writeln(str_repeat('-', strlen($title) + 1));
+
+                    if ($result->isOk()) {
+                        $this->cli->message('  Status: ' . $this->cli->green('OK'), 'cli.message');
+                    } elseif ($result->isWarning()) {
+                        $this->cli->message('  Status: ' . $this->cli->yellow('WARNING'), 'cli.message');
+                    } else {
+                        $this->cli->message('  Status: ' . $this->cli->red('ERROR'), 'cli.message');
+                    }
+
+                    $this->cli->message('  Message: ' . $result->message, 'cli.message');
+                    $this->cli->writeln();
+                }
             }
+
+            return true;
+        } catch (Exception $e) {
+            $this->displayApiError($e);
+            return true;
         }
-
-        $this->cli->writeln('========================================');
-        $this->cli->writeln('All subsystem tests complete');
-        $this->cli->writeln('========================================');
-        $this->cli->writeln();
-
-        return true;
     }
 }

@@ -1,14 +1,20 @@
 <?php
+
 /**
  * HordectlModuleTrait provides implementation for the HordectlModuleInterface
  *
  */
+
 namespace Horde\Hordectl;
+
 use Horde\Injector\Injector;
 use Horde\Argv\OptionGroup;
+use Horde_Cli_Modular_Module;
+use Horde_String;
+use ReflectionClass;
 
-trait HordectlModuleTrait {
-
+trait HordectlModuleTrait
+{
     protected Injector $dependencies;
     private $_parentModule;
     private $_parsed;
@@ -20,12 +26,12 @@ trait HordectlModuleTrait {
         return $this->getParentModule() === $this;
     }
 
-    public function getParentModule() : \Horde_Cli_Modular_Module
+    public function getParentModule(): Horde_Cli_Modular_Module
     {
         return $this->_parentModule ?? $this;
     }
 
-    public function setParentModule(\Horde_Cli_Modular_Module $module)
+    public function setParentModule(Horde_Cli_Modular_Module $module)
     {
         // TODO: prevent circular relation
         $this->_parentModule = $module;
@@ -70,7 +76,7 @@ trait HordectlModuleTrait {
      */
     public function getTitle()
     {
-        return (new \ReflectionClass($this))->getShortName();
+        return (new ReflectionClass($this))->getShortName();
     }
 
     /**
@@ -81,9 +87,9 @@ trait HordectlModuleTrait {
      *
      * Default implementation, override as needed
      */
-    public function getPositionalArgs() : array
+    public function getPositionalArgs(): array
     {
-        return [\Horde_String::lower((new \ReflectionClass($this))->getShortName())];
+        return [Horde_String::lower((new ReflectionClass($this))->getShortName())];
     }
 
     /**
@@ -109,7 +115,7 @@ trait HordectlModuleTrait {
             $this->_positional = '';
         }
         foreach ($this->getBaseOptions() as $option) {
-                $this->_parser->addOption($option);
+            $this->_parser->addOption($option);
         }
         if ($this->hasOptionGroup()) {
             $group = new OptionGroup(
@@ -124,8 +130,8 @@ trait HordectlModuleTrait {
         }
         $this->_parsed = $this->_parser->parseArgs($localArgv);
 
-        list($values, $rest) = $this->_parser->parseArgs($localArgv);
-    
+        [$values, $rest] = $this->_parser->parseArgs($localArgv);
+
         return $this->_parsed;
     }
 }

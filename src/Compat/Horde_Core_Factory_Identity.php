@@ -1,6 +1,7 @@
 <?php
+
 /**
- * Copyright 2010-2017 Horde LLC (http://www.horde.org/)
+ * Copyright 2010-2026 Horde LLC (http://www.horde.org/)
  *
  * See the enclosed file LICENSE for license information (LGPL). If you
  * did not receive this file, see http://www.horde.org/licenses/lgpl21.
@@ -10,10 +11,13 @@
  * @author   Michael Slusarz <slusarz@horde.org>
  * @license  http://www.horde.org/licenses/lgpl21 LGPL 2.1
  */
+
 namespace Horde\Hordectl\Compat;
-use \Horde_String;
-use \Horde;
+
+use Horde_String;
+use Horde;
 use Horde\Exception\HordeException;
+use Horde_Core_Factory_Base;
 
 /**
  * A Horde_Injector based Horde_Identity factory.
@@ -23,14 +27,14 @@ use Horde\Exception\HordeException;
  * @author   Michael Slusarz <slusarz@horde.org>
  * @license  http://www.horde.org/licenses/lgpl21 LGPL 2.1
  */
-class Horde_Core_Factory_Identity extends \Horde_Core_Factory_Base
+class Horde_Core_Factory_Identity extends Horde_Core_Factory_Base
 {
     /**
      * Instances.
      *
      * @var array
      */
-    private $_instances = array();
+    private $_instances = [];
 
     /**
      * Returns the Horde_Identity instance.
@@ -49,39 +53,39 @@ class Horde_Core_Factory_Identity extends \Horde_Core_Factory_Base
 
         $class = 'Horde_Core_Prefs_Identity';
         switch ($driver) {
-        case 'horde':
-            // Bug #9936: There is a conflict between the horde/Prefs
-            // Identity base driver and the application-specific Identity
-            // driver for Horde.
-            $temp_class = 'Horde_Prefs_HordeIdentity';
-            if (class_exists($temp_class)) {
-                $class = $temp_class;
-            }
-            break;
-
-        default:
-            if (!is_null($driver)) {
-                $class = \Horde_String::ucfirst($driver) . '_Prefs_Identity';
-                if (!class_exists($class)) {
-                    throw new HordeException($driver . ' identity driver does not exist.');
+            case 'horde':
+                // Bug #9936: There is a conflict between the horde/Prefs
+                // Identity base driver and the application-specific Identity
+                // driver for Horde.
+                $temp_class = 'Horde_Prefs_HordeIdentity';
+                if (class_exists($temp_class)) {
+                    $class = $temp_class;
                 }
-            }
-            break;
+                break;
+
+            default:
+                if (!is_null($driver)) {
+                    $class = Horde_String::ucfirst($driver) . '_Prefs_Identity';
+                    if (!class_exists($class)) {
+                        throw new HordeException($driver . ' identity driver does not exist.');
+                    }
+                }
+                break;
         }
         $key = $class . '|' . $user;
 
         if (!isset($this->_instances[$key])) {
-            $params = array(
+            $params = [
                 'user' => is_null($user) ? $registry->getAuth() : $user,
-            );
+            ];
 
             if (isset($prefs) && ($params['user'] == $registry->getAuth())) {
                 $params['prefs'] = $prefs;
             } else {
-                $params['prefs'] = $this->_injector->getInstance('Horde_Core_Factory_Prefs')->create($registry->getApp() ?: 'horde', array(
+                $params['prefs'] = $this->_injector->getInstance('Horde_Core_Factory_Prefs')->create($registry->getApp() ?: 'horde', [
                     'cache' => false,
-                    'user' => $user
-                ));
+                    'user' => $user,
+                ]);
             }
             $this->_instances[$key] = new $class($params);
             $this->_instances[$key]->init();

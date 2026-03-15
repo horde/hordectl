@@ -20,6 +20,7 @@ use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
+use Horde_Cli;
 
 /**
  * Configure permissions system
@@ -39,7 +40,7 @@ class Permissions implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
@@ -64,7 +65,7 @@ class Permissions implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Permissions driver (sql, mock)'
+                    'help' => 'Permissions driver (sql, mock)',
                 ]
             ),
             new Option(
@@ -72,7 +73,7 @@ class Permissions implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'string',
-                    'help' => 'Enable caching (true/false)'
+                    'help' => 'Enable caching (true/false)',
                 ]
             ),
             new Option(
@@ -80,21 +81,21 @@ class Permissions implements Module, ModuleUsage
                 [
                     'action' => 'store',
                     'type' => 'int',
-                    'help' => 'Cache lifetime in seconds'
+                    'help' => 'Cache lifetime in seconds',
                 ]
             ),
             new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
-                    'help' => 'Interactive mode with prompts'
+                    'help' => 'Interactive mode with prompts',
                 ]
             ),
             new Option(
                 '--show',
                 [
                     'action' => 'store_true',
-                    'help' => 'Show current permissions configuration'
+                    'help' => 'Show current permissions configuration',
                 ]
             ),
         ];
@@ -113,13 +114,16 @@ class Permissions implements Module, ModuleUsage
             return false;
         }
 
-        list($opts, $args) = $this->handleCommandline($argv);
+        // Check target capability
+        $target = $this->requireConfigureCapability();
+
+        [$opts, $args] = $this->handleCommandline($argv);
 
         try {
-            // Get installation directory
-            $installDir = $this->configManager->get('HORDE_INSTALL_DIR');
+            // Get installation directory from target
+            $installDir = $target->hordeInstallDir;
             if (!$installDir) {
-                $this->cli->fatal('HORDE_INSTALL_DIR not configured. Run: hordectl config set HORDE_INSTALL_DIR /path/to/horde');
+                $this->cli->fatal("Target '{$target->name}' has no installation directory configured.");
             }
 
             // Create ConfigHelper
@@ -203,9 +207,9 @@ class Permissions implements Module, ModuleUsage
             $currentLifetime = $helper->getValue('perms.cache_lifetime') ?? 300;
             $lifetime = $this->cli->prompt(
                 'Cache lifetime in seconds:',
-                (string)$currentLifetime
+                (string) $currentLifetime
             );
-            $helper->setValue('perms.cache_lifetime', (int)$lifetime);
+            $helper->setValue('perms.cache_lifetime', (int) $lifetime);
         }
 
         if ($driver === 'sql') {

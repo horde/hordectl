@@ -2,10 +2,11 @@
 
 namespace Horde\Hordectl\Command;
 
-use \Horde_Cli_Modular_Module as Module;
-use \Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use \Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
+use Horde_Cli;
 
 /**
  * Version command - displays hordectl version information
@@ -14,7 +15,7 @@ class Version implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected \Horde_Cli $cli;
+    protected Horde_Cli $cli;
 
     public function __construct(Injector $dependencies)
     {
@@ -63,7 +64,7 @@ class Version implements Module, ModuleUsage
     /**
      * Get module usage information
      *
-     * @return \Horde_Cli_Modular_ModuleUsage
+     * @return ModuleUsage
      */
     public function getUsage(): string
     {

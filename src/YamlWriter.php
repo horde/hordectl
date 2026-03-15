@@ -22,7 +22,7 @@ class YamlWriter
         $this->_resources = ['apps' => []];
     }
 
-    public function addResource(string $app, string $type, array $items, array $params = array()): void
+    public function addResource(string $app, string $type, array $items, array $params = []): void
     {
         $skel = [$app => ['resources' => [ $type => ['items' => $items]]]];
         $this->_resources['apps'] = array_merge($this->_resources['apps'], $skel);
