@@ -1,4 +1,15 @@
 ---
+1.0.0-alpha10:
+  api: 1.0.0-alpha10
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-16
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: |-
+    feat(api): Convert hordectl from hook-in approach to REST API approacj
 1.0.0-alpha9:
   api: 1.0.0-alpha9
   state:
