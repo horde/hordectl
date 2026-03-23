@@ -3,15 +3,16 @@
 namespace Horde\Hordectl\Command\Test;
 
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Exception;
-use Horde_Cli;
 
 /**
  * Test cache system via REST API
@@ -23,13 +24,15 @@ class Cache implements Module, ModuleUsage
     use AdminApiClientTrait;
     use HealthCheckDisplayTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     protected AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         $this->parser->allowInterspersedArgs = false;
     }

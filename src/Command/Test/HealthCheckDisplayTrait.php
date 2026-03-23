@@ -37,14 +37,14 @@ trait HealthCheckDisplayTrait
     protected function displayHealthCheck(HealthCheckResult $result): void
     {
         if ($result->isOk()) {
-            $this->cli->message('Status: ' . $this->cli->green('OK'), 'cli.message');
-            $this->cli->message('Message: ' . $result->message, 'cli.message');
+            $this->output->ok('Status: OK');
+            $this->output->info('Message: ' . $result->message);
         } elseif ($result->isWarning()) {
-            $this->cli->message('Status: ' . $this->cli->yellow('WARNING'), 'cli.message');
-            $this->cli->message('Message: ' . $result->message, 'cli.warning');
+            $this->output->warn('Status: WARNING');
+            $this->output->warn('Message: ' . $result->message);
         } else {
-            $this->cli->message('Status: ' . $this->cli->red('ERROR'), 'cli.message');
-            $this->cli->message('Message: ' . $result->message, 'cli.error');
+            $this->output->error('Status: ERROR');
+            $this->output->error('Message: ' . $result->message);
         }
 
         // Display details
@@ -72,7 +72,7 @@ trait HealthCheckDisplayTrait
     protected function displayApiError(Exception $e): void
     {
         $this->cli->writeln();
-        $this->cli->message('ERROR: ' . $e->getMessage(), 'cli.error');
+        $this->output->error('ERROR: ' . $e->getMessage());
         $this->cli->writeln();
         $this->cli->writeln('Unable to perform health check via REST API.');
         $this->cli->writeln('Please check:');

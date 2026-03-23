@@ -4,13 +4,14 @@ namespace Horde\Hordectl\Command\Import;
 
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Horde\Argv\Parser;
-use Horde_Cli;
 use RuntimeException;
 
 /**
@@ -24,13 +25,15 @@ class Permission implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -84,7 +87,7 @@ class Permission implements Module, ModuleUsage
         $items = $tree['apps']['builtin']['resources']['permission']['items'] ?? [];
 
         if (empty($items)) {
-            $this->cli->message('No permissions to import', 'cli.warning');
+            $this->output->warn('No permissions to import');
             return true;
         }
 
@@ -101,7 +104,7 @@ class Permission implements Module, ModuleUsage
             $state = $item['state'] ?? 'present';
 
             if (!$name) {
-                $this->cli->message('Skipping permission item without name', 'cli.warning');
+                $this->output->warn('Skipping permission item without name');
                 $skipped++;
                 continue;
             }
@@ -120,15 +123,13 @@ class Permission implements Module, ModuleUsage
                     // Delete permission
                     if ($exists) {
                         $this->apiClient->deletePermission($name);
-                        $this->cli->message(
-                            sprintf('Deleted permission: %s', $name),
-                            'cli.success'
+                        $this->output->ok(
+                            sprintf('Deleted permission: %s', $name)
                         );
                         $deleted++;
                     } else {
-                        $this->cli->message(
-                            sprintf('Permission "%s" already absent', $name),
-                            'cli.warning'
+                        $this->output->warn(
+                            sprintf('Permission "%s" already absent', $name)
                         );
                         $skipped++;
                     }
@@ -136,31 +137,27 @@ class Permission implements Module, ModuleUsage
                     if ($exists) {
                         // Update existing permission
                         $this->apiClient->updatePermission($name, $data);
-                        $this->cli->message(
-                            sprintf('Updated permission: %s', $name),
-                            'cli.success'
+                        $this->output->ok(
+                            sprintf('Updated permission: %s', $name)
                         );
                         $updated++;
                     } else {
                         // Create new permission
                         $this->apiClient->createPermission($name, $type, $data);
-                        $this->cli->message(
-                            sprintf('Created permission: %s', $name),
-                            'cli.success'
+                        $this->output->ok(
+                            sprintf('Created permission: %s', $name)
                         );
                         $created++;
                     }
                 } else {
-                    $this->cli->message(
-                        sprintf('Invalid state "%s" for permission "%s" - must be "present" or "absent"', $state, $name),
-                        'cli.error'
+                    $this->output->error(
+                        sprintf('Invalid state "%s" for permission "%s" - must be "present" or "absent"', $state, $name)
                     );
                     $errors++;
                 }
             } catch (RuntimeException $e) {
-                $this->cli->message(
-                    sprintf('Error importing permission "%s": %s', $name, $e->getMessage()),
-                    'cli.error'
+                $this->output->error(
+                    sprintf('Error importing permission "%s": %s', $name, $e->getMessage())
                 );
                 $errors++;
             }
@@ -168,7 +165,7 @@ class Permission implements Module, ModuleUsage
 
         // Summary
         $this->cli->writeln();
-        $this->cli->message(
+        $this->output->ok(
             sprintf(
                 'Import summary: %d created, %d updated, %d deleted, %d skipped, %d errors',
                 $created,
@@ -176,8 +173,7 @@ class Permission implements Module, ModuleUsage
                 $deleted,
                 $skipped,
                 $errors
-            ),
-            'cli.success'
+            )
         );
 
         return true;

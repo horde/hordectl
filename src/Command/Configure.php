@@ -15,9 +15,10 @@ use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait;
+use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Configure command module - setup and configure Horde subsystems
@@ -32,12 +33,14 @@ class Configure implements Module, ModuleUsage
     use ModuleTrait;
     use HasModulesTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
@@ -90,7 +93,7 @@ class Configure implements Module, ModuleUsage
         // If no submodule handled it, show usage
         if (!$handled) {
             $this->cli->writeln();
-            $this->cli->message("Unknown configure subcommand: {$argv[0]}", 'cli.error');
+            $this->output->error("Unknown configure subcommand: {$argv[0]}");
             $this->cli->writeln();
             $this->showUsage();
         }

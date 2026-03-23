@@ -15,11 +15,12 @@ use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use RuntimeException;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Activate Horde installation
@@ -38,13 +39,15 @@ class Activate implements Module, ModuleUsage
     use ModuleTrait;
     use TargetCapabilityTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
@@ -101,7 +104,7 @@ class Activate implements Module, ModuleUsage
 
             // Check if target already exists
             if (file_exists($targetFile) && !($opts->force ?? false)) {
-                $this->cli->message("Configuration already exists: $targetFile", 'cli.warning');
+                $this->output->warn("Configuration already exists: $targetFile");
                 $this->cli->writeln('Use --force to overwrite.');
                 return true;
             }
@@ -111,7 +114,7 @@ class Activate implements Module, ModuleUsage
                 if (!mkdir($targetDir, 0o755, true)) {
                     $this->cli->fatal("Failed to create directory: $targetDir");
                 }
-                $this->cli->message("Created directory: $targetDir", 'cli.success');
+                $this->output->ok("Created directory: $targetDir");
             }
 
             // Copy conf.php.dist to conf.php
@@ -123,13 +126,13 @@ class Activate implements Module, ModuleUsage
             chmod($targetFile, 0o600);
 
             $this->cli->writeln();
-            $this->cli->message('✓ Configuration file created', 'cli.success');
+            $this->output->ok('Configuration file created');
             $this->cli->writeln("  Created: $targetFile");
             $this->cli->writeln("  Source: $sourceFile");
 
             // Trigger the installer plugin to link configs
             $this->cli->writeln();
-            $this->cli->message('Linking configuration to vendor directories...', 'cli.message');
+            $this->output->info('Linking configuration to vendor directories...');
 
             $composerBin = $this->findComposerBinary($installDir);
             if ($composerBin) {
@@ -139,21 +142,21 @@ class Activate implements Module, ModuleUsage
                 exec("$composerBin horde:reconfigure 2>&1", $output, $return);
 
                 if ($return === 0) {
-                    $this->cli->message('✓ Configuration linked successfully', 'cli.success');
+                    $this->output->ok('Configuration linked successfully');
                 } else {
-                    $this->cli->message('Warning: Could not run composer horde:reconfigure', 'cli.warning');
+                    $this->output->warn('Could not run composer horde:reconfigure');
                     $this->cli->writeln('You may need to run it manually:');
                     $this->cli->writeln("  cd $installDir && composer horde:reconfigure");
                 }
             } else {
-                $this->cli->message('Warning: Composer not found', 'cli.warning');
+                $this->output->warn('Composer not found');
                 $this->cli->writeln('Configuration created but not linked to vendor directories.');
                 $this->cli->writeln('Run manually:');
                 $this->cli->writeln("  cd $installDir && composer horde:reconfigure");
             }
 
             $this->cli->writeln();
-            $this->cli->message('✓ Horde installation activated!', 'cli.success');
+            $this->output->ok('Horde installation activated!');
             $this->cli->writeln();
             $this->cli->writeln("  Configuration file created: $targetFile");
             $this->cli->writeln("  Source: $sourceFile");

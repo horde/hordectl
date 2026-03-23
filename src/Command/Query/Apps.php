@@ -16,15 +16,16 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command\Query;
 
+use Exception;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Exception;
-use Horde_Cli;
 
 /**
  * Query command module for applications (meta-resources)
@@ -46,7 +47,8 @@ class Apps implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     protected AdminApiClient $apiClient;
 
     /**
@@ -57,7 +59,8 @@ class Apps implements Module, ModuleUsage
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
     }
 
     /**
@@ -88,7 +91,7 @@ class Apps implements Module, ModuleUsage
 
             if ($appList->isEmpty()) {
                 $this->cli->writeln();
-                $this->cli->message('No applications found', 'cli.warning');
+                $this->output->warn('No applications found');
                 $this->cli->writeln();
                 return true;
             }
@@ -110,7 +113,7 @@ class Apps implements Module, ModuleUsage
 
         } catch (Exception $e) {
             $this->cli->writeln();
-            $this->cli->message('ERROR: ' . $e->getMessage(), 'cli.error');
+            $this->output->error($e->getMessage());
             $this->cli->writeln();
             $this->cli->writeln('Unable to query applications via REST API.');
             $this->cli->writeln('Please check:');

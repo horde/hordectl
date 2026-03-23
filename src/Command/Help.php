@@ -5,10 +5,11 @@ namespace Horde\Hordectl\Command;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Exception;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  *
@@ -18,13 +19,15 @@ class Help implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     protected Parser $parser;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -111,7 +114,7 @@ class Help implements Module, ModuleUsage
         $className = 'Horde\\Hordectl\\Command\\' . ucfirst($commandName);
 
         if (!class_exists($className)) {
-            $this->cli->message(sprintf('Unknown command: %s', $commandName), 'cli.error');
+            $this->output->error(sprintf('Unknown command: %s', $commandName));
             $this->cli->writeln();
             $this->cli->writeln('Run "hordectl help" to see available commands.');
             $this->cli->writeln();
@@ -150,7 +153,7 @@ class Help implements Module, ModuleUsage
                 $this->cli->writeln();
             }
         } catch (Exception $e) {
-            $this->cli->message('Error loading command: ' . $e->getMessage(), 'cli.error');
+            $this->output->error('Error loading command: ' . $e->getMessage());
             $this->cli->writeln();
         }
     }
@@ -165,6 +168,7 @@ class Help implements Module, ModuleUsage
         return [
             'help' => 'Show this help message',
             'target' => 'Manage multi-target configuration (current, list, use, add, etc.)',
+            'create' => 'Create resources interactively (user, group)',
             'query' => 'Query and export Horde resources via API (requires API endpoint)',
             'import' => 'Import resources into Horde from YAML (requires API endpoint)',
             'patch' => 'Modify individual resources (requires API endpoint)',

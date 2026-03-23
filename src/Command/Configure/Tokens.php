@@ -14,13 +14,14 @@ namespace Horde\Hordectl\Command\Configure;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Configure tokens system
@@ -41,13 +42,15 @@ class Tokens implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
@@ -141,8 +144,8 @@ class Tokens implements Module, ModuleUsage
             // Save configuration
             $this->cli->writeln();
             $helper->save();
-            $this->cli->message('✓ Token configuration saved', 'cli.success');
-            $this->cli->message('  Backup created: ' . basename($helper->getBackupFile()), 'cli.message');
+            $this->output->ok('Token configuration saved');
+            $this->output->info('  Backup created: ' . basename($helper->getBackupFile()));
             $this->cli->writeln();
 
             return true;
@@ -203,7 +206,7 @@ class Tokens implements Module, ModuleUsage
             if ($updateSecret) {
                 $secret = $this->generateSecret();
                 $helper->setValue('token.secret', $secret);
-                $this->cli->message('Generated new secret key', 'cli.success');
+                $this->output->ok('Generated new secret key');
             }
         } else {
             $this->cli->writeln('No secret key configured. A secret key is required for token generation.');
@@ -214,7 +217,7 @@ class Tokens implements Module, ModuleUsage
             if ($generateSecret) {
                 $secret = $this->generateSecret();
                 $helper->setValue('token.secret', $secret);
-                $this->cli->message('Generated secret key', 'cli.success');
+                $this->output->ok('Generated secret key');
             } else {
                 $secret = $this->cli->passwordPrompt('Enter secret key:');
                 if ($secret !== '') {
@@ -236,7 +239,7 @@ class Tokens implements Module, ModuleUsage
 
         if ($driver === 'sql') {
             $this->cli->writeln();
-            $this->cli->message('Note: SQL driver uses the main database configuration.', 'cli.message');
+            $this->output->info('Note: SQL driver uses the main database configuration.');
             $this->cli->writeln('      Run "hordectl configure database" to configure the database.');
             $this->cli->writeln();
         }
@@ -265,9 +268,8 @@ class Tokens implements Module, ModuleUsage
                 $helper->setValue('token.secret', $secret);
                 $this->cli->writeln('  Secret: (generated)');
             } else {
-                $this->cli->message(
-                    'Warning: Secret in command line is visible in process list',
-                    'cli.warning'
+                $this->output->warn(
+                    'Warning: Secret in command line is visible in process list'
                 );
                 $helper->setValue('token.secret', $opts->secret);
                 $this->cli->writeln('  Secret: ********');
@@ -295,7 +297,7 @@ class Tokens implements Module, ModuleUsage
         $token = $helper->getValue('token');
 
         if (empty($token)) {
-            $this->cli->message('No token configuration found.', 'cli.warning');
+            $this->output->warn('No token configuration found.');
             $this->cli->writeln('Using defaults: SQL driver with 1-day expiration.');
             $this->cli->writeln();
             return;
@@ -323,7 +325,7 @@ class Tokens implements Module, ModuleUsage
 
         if (!isset($token['secret']) || empty($token['secret'])) {
             $this->cli->writeln();
-            $this->cli->message('  Warning: No secret key configured!', 'cli.warning');
+            $this->output->warn('  Warning: No secret key configured!');
             $this->cli->writeln('  Token generation will not work without a secret key.');
             $this->cli->writeln('  Run "hordectl configure tokens" to generate one.');
         }

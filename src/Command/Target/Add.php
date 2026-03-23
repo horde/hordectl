@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command\Target;
 
+use Exception;
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\Exception\TargetAlreadyExistsException;
 use Horde\Hordectl\HordectlModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Target;
 use Horde\Hordectl\TargetResolver;
 use Horde\Hordectl\TargetType;
 use Horde\Injector\Injector;
-use Horde_Cli;
 use Horde_Cli_Modular_Module as Module;
-use Exception;
 
 /**
  * Target add command
@@ -28,13 +29,15 @@ class Add implements Module
 {
     use HordectlModuleTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     protected Parser $parser;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
     }
 
