@@ -14,13 +14,14 @@ namespace Horde\Hordectl\Command\Configure;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Configure session handler settings
@@ -41,13 +42,15 @@ class SessionHandler implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
@@ -194,8 +197,8 @@ class SessionHandler implements Module, ModuleUsage
             // Save configuration
             $this->cli->writeln();
             $helper->save();
-            $this->cli->message('✓ Session handler configuration saved', 'cli.success');
-            $this->cli->message('  Backup created: ' . basename($helper->getBackupFile()), 'cli.message');
+            $this->output->ok('Session handler configuration saved');
+            $this->output->info('  Backup created: ' . basename($helper->getBackupFile()));
             $this->cli->writeln();
 
             return true;
@@ -404,7 +407,7 @@ class SessionHandler implements Module, ModuleUsage
         $session = $helper->getValue('sessionhandler');
 
         if (empty($session)) {
-            $this->cli->message('No session handler configuration found.', 'cli.warning');
+            $this->output->warn('No session handler configuration found.');
             $this->cli->writeln();
             return;
         }

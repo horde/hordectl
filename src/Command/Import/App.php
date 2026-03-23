@@ -7,7 +7,8 @@ use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
+use Horde\Hordectl\Output;
 
 /**
  * Import command module for Horde App provided resources
@@ -23,11 +24,13 @@ class App implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -43,13 +46,11 @@ class App implements Module, ModuleUsage
 
         // App-specific resources (turba/contacts, kronolith/events, etc.)
         // require REST API CRD operations which are not yet implemented
-        $this->cli->message(
-            "UNSUPPORTED: App resource import for '$app/$resource' requires REST API CRD support.",
-            'cli.warning'
+        $this->output->warn(
+            "UNSUPPORTED: App resource import for '$app/$resource' requires REST API CRD support."
         );
-        $this->cli->message(
-            'App-specific resource import is deferred until Admin REST API CRD operations are implemented.',
-            'cli.warning'
+        $this->output->warn(
+            'App-specific resource import is deferred until Admin REST API CRD operations are implemented.'
         );
 
         return false;

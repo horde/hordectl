@@ -7,13 +7,14 @@ use Horde\Argv\Parser;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HasModulesTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Exception;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 use RuntimeException;
 
 /**
@@ -26,13 +27,15 @@ class Patch implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
@@ -96,30 +99,25 @@ class Patch implements Module, ModuleUsage
                 }
 
                 if ($exists) {
-                    $this->cli->message(
-                        sprintf('Updating password for user "%s"', $username),
-                        'cli.message'
+                    $this->output->info(
+                        sprintf('Updating password for user "%s"', $username)
                     );
                     $this->apiClient->patchUserPassword($username, $password);
-                    $this->cli->message(
-                        sprintf('Successfully updated password for user "%s"', $username),
-                        'cli.success'
+                    $this->output->ok(
+                        sprintf('Successfully updated password for user "%s"', $username)
                     );
                 } else {
-                    $this->cli->message(
-                        'Error: User creation not supported via REST API. Use import command instead.',
-                        'cli.error'
+                    $this->output->error(
+                        'User creation not supported via REST API. Use import command instead.'
                     );
-                    $this->cli->message(
-                        sprintf('User "%s" does not exist and cannot be created via patch command', $username),
-                        'cli.error'
+                    $this->output->error(
+                        sprintf('User "%s" does not exist and cannot be created via patch command', $username)
                     );
                 }
                 return true;
             } catch (Exception $e) {
-                $this->cli->message(
-                    sprintf('Error: %s', $e->getMessage()),
-                    'cli.error'
+                $this->output->error(
+                    sprintf('Error: %s', $e->getMessage())
                 );
                 return true;
             }

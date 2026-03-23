@@ -6,11 +6,12 @@ use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait;
+use Horde\Hordectl\Output;
 use Horde\Yaml\Yaml;
 use Horde\Injector\Injector;
 use Horde\Argv\Option;
 use Horde\Argv\Parser;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  *
@@ -21,12 +22,14 @@ class Import implements Module, ModuleUsage
     use ModuleTrait;
     use HasModulesTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         //        $this->_parser->allowInterspersedArgs = false;
@@ -100,7 +103,7 @@ class Import implements Module, ModuleUsage
             return false;
         }
         if (!is_file($myArgs->filename)) {
-            $this->cli->message('File not found: ' . $myArgs->filename, 'cli.error');
+            $this->output->error('File not found: ' . $myArgs->filename);
         }
         // Decode yaml
         $importData = Yaml::loadFile($myArgs->filename);

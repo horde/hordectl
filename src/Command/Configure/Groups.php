@@ -14,13 +14,14 @@ namespace Horde\Hordectl\Command\Configure;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Configure groups backend and settings
@@ -40,13 +41,15 @@ class Groups implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
@@ -140,8 +143,8 @@ class Groups implements Module, ModuleUsage
             // Save configuration
             $this->cli->writeln();
             $helper->save();
-            $this->cli->message('✓ Groups configuration saved', 'cli.success');
-            $this->cli->message('  Backup created: ' . basename($helper->getBackupFile()), 'cli.message');
+            $this->output->ok('Groups configuration saved');
+            $this->output->info('  Backup created: ' . basename($helper->getBackupFile()));
             $this->cli->writeln();
 
             return true;
@@ -212,12 +215,12 @@ class Groups implements Module, ModuleUsage
         // Driver-specific configuration
         if ($driver === 'sql') {
             $this->cli->writeln();
-            $this->cli->message('Note: SQL driver uses the main database configuration.', 'cli.message');
+            $this->output->info('Note: SQL driver uses the main database configuration.');
             $this->cli->writeln('      Run "hordectl configure database" to configure the database.');
             $this->cli->writeln();
         } elseif ($driver === 'ldap') {
             $this->cli->writeln();
-            $this->cli->message('Note: LDAP driver uses the main LDAP configuration.', 'cli.message');
+            $this->output->info('Note: LDAP driver uses the main LDAP configuration.');
             $this->cli->writeln('      Run "hordectl configure ldap" to configure LDAP.');
             $this->cli->writeln();
         }
@@ -267,7 +270,7 @@ class Groups implements Module, ModuleUsage
         $group = $helper->getValue('group');
 
         if (empty($group)) {
-            $this->cli->message('No groups configuration found.', 'cli.warning');
+            $this->output->warn('No groups configuration found.');
             $this->cli->writeln('Using defaults: SQL driver with caching enabled.');
             $this->cli->writeln();
             return;

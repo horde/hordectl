@@ -8,8 +8,9 @@ use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait as HasModules;
+use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Secret command - manage admin_secret for hordectl REST API authentication
@@ -28,12 +29,14 @@ class Secret implements Module, ModuleUsage
     use ModuleTrait;
     use HasModules;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->_initModules(
             $dependencies,
             '\Horde\Hordectl\Command\Secret',
@@ -74,9 +77,8 @@ class Secret implements Module, ModuleUsage
             // If no subcommand handled it, show error and help
             if (!$handled) {
                 $this->cli->writeln();
-                $this->cli->message(
-                    sprintf('Unknown secret subcommand: %s', $moduleArgs[0]),
-                    'cli.error'
+                $this->output->error(
+                    sprintf('Unknown secret subcommand: %s', $moduleArgs[0])
                 );
                 $this->showHelp();
             }
@@ -93,7 +95,7 @@ class Secret implements Module, ModuleUsage
     protected function showHelp(): void
     {
         $this->cli->writeln();
-        $this->cli->message('Hordectl Secret Management', 'cli.success');
+        $this->output->ok('Hordectl Secret Management');
         $this->cli->writeln();
         $this->cli->writeln('Manage admin_secret for hordectl REST API authentication.');
         $this->cli->writeln();

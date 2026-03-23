@@ -9,10 +9,10 @@ namespace Horde\Hordectl;
 use Horde\Argv\IndentedHelpFormatter;
 use Horde\Argv\Option;
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Exception\HordeException;
 use Horde\Injector\Injector;
 use Horde\Injector\TopLevel;
-use Horde_Cli;
 use Horde_Cli_Modular as Cli_Modular;
 use Horde_Cli_Modular_Module as Module;
 use Horde_String;
@@ -37,12 +37,12 @@ class Cli implements Module
     use HordectlModuleTrait;
     use HasModulesTrait;
 
-    protected Horde_Cli|Modular $cli;
+    protected HordeCli|Modular $cli;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->_parser->allowInterspersedArgs = false;
@@ -84,11 +84,13 @@ class Cli implements Module
     // Setup a Horde_Cli_Modular, a Parser, setup self as root module
     public static function main(array $parameters = [])
     {
-        // Use plain Horde Injector as long as we have no need to wrap it into something more specific
-        $cli = new Horde_Cli(['pager' => true]);
+        // Use modern Horde\Cli\Cli
+        $cli = new HordeCli(['pager' => true]);
 
         // Setup dependencies (no Horde bootstrap - target-based approach only)
         $dependencies = new Dependencies(new TopLevel());
+        $dependencies->setInstance(HordeCli::class, $cli);
+        // Also register as legacy name for backward compatibility during migration
         $dependencies->setInstance('\Horde_Cli', $cli);
 
         // Setup the CLI Parser

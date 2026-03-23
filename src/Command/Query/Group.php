@@ -2,15 +2,16 @@
 
 namespace Horde\Hordectl\Command\Query;
 
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Horde_Cli;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use RuntimeException;
 
 /**
@@ -22,13 +23,15 @@ class Group implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance(Horde_Cli::class);
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -85,9 +88,8 @@ class Group implements Module, ModuleUsage
                 $writer->addResource('builtin', 'group', $allGroups);
             }
         } catch (RuntimeException $e) {
-            $this->cli->message(
-                sprintf('Error: %s', $e->getMessage()),
-                'cli.error'
+            $this->output->error(
+                sprintf('Error: %s', $e->getMessage())
             );
             return true;
         }

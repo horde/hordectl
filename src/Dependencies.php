@@ -6,6 +6,7 @@
 
 namespace Horde\Hordectl;
 
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\Configuration\AppConfigReader;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\Service\AdminApiConfig;
@@ -52,6 +53,23 @@ class Dependencies extends Injector
             new Service\NullAdminApiClient()
         );
     }
+
+    /**
+     * Create Output facade with presentation layer
+     *
+     * @param HordeCli $cli The CLI instance
+     * @param array $options Configuration options (verbose, quiet)
+     * @return Output The output facade
+     */
+    public function createOutput(HordeCli $cli, array $options = []): Output
+    {
+        return new Output(
+            $cli,
+            verbose: !empty($options['verbose']),
+            quiet: !empty($options['quiet'])
+        );
+    }
+
     /**
      * Expose Horde Config in global namespace (DEPRECATED)
      *

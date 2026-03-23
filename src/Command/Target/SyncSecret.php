@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command\Target;
 
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\Exception\TargetNotFoundException;
 use Horde\Hordectl\HordectlModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Target;
 use Horde\Hordectl\TargetResolver;
 use Horde\Injector\Injector;
-use Horde_Cli;
 use Horde_Cli_Modular_Module as Module;
 
 /**
@@ -26,12 +27,14 @@ class SyncSecret implements Module
 {
     use HordectlModuleTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
     }
 
     public function handle(array $argv = []): bool

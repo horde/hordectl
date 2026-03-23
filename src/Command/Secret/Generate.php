@@ -6,11 +6,12 @@ namespace Horde\Hordectl\Command\Secret;
 
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\ConfigFileWriter;
 use Horde\Injector\Injector;
 use Exception;
-use Horde_Cli;
 use RuntimeException;
 
 /**
@@ -29,13 +30,15 @@ class Generate implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     protected ConfigFileWriter $configWriter;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configWriter = new ConfigFileWriter();
     }
 
@@ -71,14 +74,14 @@ class Generate implements Module, ModuleUsage
         $force = in_array('--force', $args);
 
         $this->cli->writeln();
-        $this->cli->message('Generating admin_secret for hordectl REST API...', 'cli.success');
+        $this->output->ok('Generating admin_secret for hordectl REST API...');
         $this->cli->writeln();
 
         // Find Horde installation
         $hordeDir = $this->getHordeDir($args);
         if (!$hordeDir) {
             $this->cli->writeln();
-            $this->cli->message('ERROR: Could not find Horde installation', 'cli.error');
+            $this->output->error('Could not find Horde installation');
             $this->cli->writeln();
             $this->cli->writeln('Please specify the installation root directory:');
             $this->cli->writeln('  hordectl secret generate --installation-root-dir=/var/www/horde');
@@ -94,7 +97,7 @@ class Generate implements Module, ModuleUsage
         // Check if conf.php exists
         if (!file_exists($confPath)) {
             $this->cli->writeln();
-            $this->cli->message('ERROR: Configuration file not found', 'cli.error');
+            $this->output->error('Configuration file not found');
             $this->cli->writeln();
             $this->cli->writeln("Expected: {$confPath}");
             $this->cli->writeln();
@@ -117,7 +120,7 @@ class Generate implements Module, ModuleUsage
             }
 
             if ($existingSecret && !$force) {
-                $this->cli->message('An admin_secret already exists', 'cli.warning');
+                $this->output->warn('An admin_secret already exists');
                 $this->cli->writeln();
                 $this->cli->writeln('Current secret: ' . $this->maskSecret($existingSecret));
                 $this->cli->writeln();
@@ -147,25 +150,25 @@ class Generate implements Module, ModuleUsage
 
             $this->cli->writeln();
             if ($existingSecret) {
-                $this->cli->message('✓ SUCCESS: admin_secret rotated!', 'cli.success');
+                $this->output->ok('SUCCESS: admin_secret rotated!');
                 $this->cli->writeln();
                 $this->cli->writeln('Old secret: ' . $this->maskSecret($existingSecret));
                 $this->cli->writeln('New secret: ' . $secret);
             } else {
-                $this->cli->message('✓ SUCCESS: admin_secret generated!', 'cli.success');
+                $this->output->ok('SUCCESS: admin_secret generated!');
                 $this->cli->writeln();
                 $this->cli->writeln('Your admin_secret:');
                 $this->cli->writeln('  ' . $secret);
             }
             $this->cli->writeln();
-            $this->cli->message('IMPORTANT: Store this secret securely!', 'cli.warning');
+            $this->output->warn('IMPORTANT: Store this secret securely!');
             $this->cli->writeln();
             $this->cli->writeln('This secret grants full administrative access to Horde.');
             $this->cli->writeln('Do not share it or commit it to version control.');
             $this->cli->writeln();
 
             if ($existingSecret) {
-                $this->cli->message('⚠ Old hordectl connections will break immediately!', 'cli.warning');
+                $this->output->warn('Old hordectl connections will break immediately!');
                 $this->cli->writeln();
                 $this->cli->writeln('Update ~/.hordectl/config.yml with the new secret:');
                 $this->cli->writeln();
@@ -187,7 +190,7 @@ class Generate implements Module, ModuleUsage
             }
         } catch (Exception $e) {
             $this->cli->writeln();
-            $this->cli->message('ERROR: Failed to generate secret', 'cli.error');
+            $this->output->error('Failed to generate secret');
             $this->cli->writeln();
             $this->cli->writeln($e->getMessage());
             $this->cli->writeln();

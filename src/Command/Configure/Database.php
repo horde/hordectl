@@ -17,13 +17,14 @@ use Horde\Hordectl\Command\Configure\ConfigureHelperTrait;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use PDO;
 use PDOException;
 use RuntimeException;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Configure database settings
@@ -45,13 +46,15 @@ class Database implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
@@ -213,7 +216,7 @@ class Database implements Module, ModuleUsage
                 $this->cli->writeln();
                 if (!$this->testConnectionWithConfig($helper->getAll())) {
                     $this->cli->writeln();
-                    $this->cli->message('Connection test failed. Configuration not saved.', 'cli.error');
+                    $this->output->error('Connection test failed. Configuration not saved.');
                     return false;
                 }
             }
@@ -221,8 +224,8 @@ class Database implements Module, ModuleUsage
             // Save configuration
             $this->cli->writeln();
             $helper->save();
-            $this->cli->message('✓ Database configuration saved', 'cli.success');
-            $this->cli->message('  Backup created: ' . basename($helper->getBackupFile()), 'cli.message');
+            $this->output->ok('Database configuration saved');
+            $this->output->info('Backup created: ' . basename($helper->getBackupFile()));
             $this->cli->writeln();
 
             return true;
@@ -390,10 +393,7 @@ class Database implements Module, ModuleUsage
         }
 
         if (isset($opts->password)) {
-            $this->cli->message(
-                'Warning: Password in command line is visible in process list',
-                'cli.warning'
-            );
+            $this->output->warn('Password in command line is visible in process list');
             $helper->setValue('sql.password', $opts->password);
             $this->cli->writeln('  Password: ********');
         }
@@ -429,7 +429,7 @@ class Database implements Module, ModuleUsage
         $sql = $helper->getValue('sql');
 
         if (empty($sql)) {
-            $this->cli->message('No database configuration found.', 'cli.warning');
+            $this->output->warn('No database configuration found.');
             $this->cli->writeln();
             return;
         }
@@ -479,7 +479,7 @@ class Database implements Module, ModuleUsage
     private function testConnectionWithConfig(array $config): bool
     {
         if (!isset($config['sql'])) {
-            $this->cli->message('✗ No database configuration found', 'cli.error');
+            $this->output->error('No database configuration found');
             return false;
         }
 
@@ -488,7 +488,7 @@ class Database implements Module, ModuleUsage
         // Validate required fields
         $type = $sql['phptype'] ?? null;
         if (!$type) {
-            $this->cli->message('✗ Database type not configured', 'cli.error');
+            $this->output->error('Database type not configured');
             return false;
         }
 
@@ -499,12 +499,12 @@ class Database implements Module, ModuleUsage
 
         // Other databases need more configuration
         if (!isset($sql['database'])) {
-            $this->cli->message('✗ Database name not configured', 'cli.error');
+            $this->output->error('Database name not configured');
             return false;
         }
 
         if (!isset($sql['username'])) {
-            $this->cli->message('✗ Database username not configured', 'cli.error');
+            $this->output->error('Database username not configured');
             return false;
         }
 
@@ -527,10 +527,10 @@ class Database implements Module, ModuleUsage
             // Test query
             $pdo->query('SELECT 1');
 
-            $this->cli->message('✓ Database connection successful', 'cli.success');
+            $this->output->ok('Database connection successful');
             return true;
         } catch (PDOException $e) {
-            $this->cli->message('✗ Database connection failed', 'cli.error');
+            $this->output->error('Database connection failed');
             $this->cli->writeln('  Error: ' . $e->getMessage());
             return false;
         }
@@ -546,7 +546,7 @@ class Database implements Module, ModuleUsage
     {
         $database = $sql['database'] ?? null;
         if (!$database) {
-            $this->cli->message('✗ Database file path not configured', 'cli.error');
+            $this->output->error('Database file path not configured');
             return false;
         }
 
@@ -558,10 +558,10 @@ class Database implements Module, ModuleUsage
             $pdo = new PDO($dsn);
             $pdo->query('SELECT 1');
 
-            $this->cli->message('✓ SQLite database accessible', 'cli.success');
+            $this->output->ok('SQLite database accessible');
             return true;
         } catch (PDOException $e) {
-            $this->cli->message('✗ SQLite connection failed', 'cli.error');
+            $this->output->error('SQLite connection failed');
             $this->cli->writeln('  Error: ' . $e->getMessage());
             return false;
         }

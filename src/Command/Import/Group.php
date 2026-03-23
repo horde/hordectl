@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Horde\Hordectl\Command\Import;
 
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Horde_Cli;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use RuntimeException;
@@ -24,13 +25,15 @@ class Group implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance(Horde_Cli::class);
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -69,7 +72,7 @@ class Group implements Module, ModuleUsage
         $items = $tree['apps']['builtin']['resources']['group']['items'] ?? [];
 
         if (empty($items)) {
-            $this->cli->message('No groups to import', 'cli.warning');
+            $this->output->warn('No groups to import');
             return true;
         }
 
@@ -85,7 +88,7 @@ class Group implements Module, ModuleUsage
             $state = $item['state'] ?? 'present';
 
             if (!$groupName) {
-                $this->cli->message('Skipping group item without groupName', 'cli.warning');
+                $this->output->warn('Skipping group item without groupName');
                 $skipped++;
                 continue;
             }
@@ -104,15 +107,13 @@ class Group implements Module, ModuleUsage
                     // Delete group
                     if ($exists) {
                         $this->apiClient->deleteGroup($groupName);
-                        $this->cli->message(
-                            sprintf('Deleted group: %s', $groupName),
-                            'cli.success'
+                        $this->output->ok(
+                            sprintf('Deleted group: %s', $groupName)
                         );
                         $deleted++;
                     } else {
-                        $this->cli->message(
-                            sprintf('Group "%s" already absent', $groupName),
-                            'cli.warning'
+                        $this->output->warn(
+                            sprintf('Group "%s" already absent', $groupName)
                         );
                         $skipped++;
                     }
@@ -120,14 +121,13 @@ class Group implements Module, ModuleUsage
                     if ($exists) {
                         // Group exists - update members using incremental add/remove
                         $memberChanges = $this->updateGroupMembers($groupName, $members);
-                        $this->cli->message(
+                        $this->output->ok(
                             sprintf(
                                 'Updated group "%s": %d added, %d removed',
                                 $groupName,
                                 $memberChanges['added'],
                                 $memberChanges['removed']
-                            ),
-                            'cli.success'
+                            )
                         );
                         $updated++;
                     } else {
@@ -139,23 +139,20 @@ class Group implements Module, ModuleUsage
                             $this->apiClient->setGroupMembers($group->id, $members);
                         }
 
-                        $this->cli->message(
-                            sprintf('Created group "%s" with %d member(s)', $groupName, count($members)),
-                            'cli.success'
+                        $this->output->ok(
+                            sprintf('Created group "%s" with %d member(s)', $groupName, count($members))
                         );
                         $created++;
                     }
                 } else {
-                    $this->cli->message(
-                        sprintf('Invalid state "%s" for group "%s" - must be "present" or "absent"', $state, $groupName),
-                        'cli.error'
+                    $this->output->error(
+                        sprintf('Invalid state "%s" for group "%s" - must be "present" or "absent"', $state, $groupName)
                     );
                     $errors++;
                 }
             } catch (RuntimeException $e) {
-                $this->cli->message(
-                    sprintf('Error importing group "%s": %s', $groupName, $e->getMessage()),
-                    'cli.error'
+                $this->output->error(
+                    sprintf('Error importing group "%s": %s', $groupName, $e->getMessage())
                 );
                 $errors++;
             }
@@ -163,7 +160,7 @@ class Group implements Module, ModuleUsage
 
         // Summary
         $this->cli->writeln();
-        $this->cli->message(
+        $this->output->ok(
             sprintf(
                 'Import summary: %d created, %d updated, %d deleted, %d skipped, %d errors',
                 $created,
@@ -171,8 +168,7 @@ class Group implements Module, ModuleUsage
                 $deleted,
                 $skipped,
                 $errors
-            ),
-            'cli.success'
+            )
         );
 
         return true;

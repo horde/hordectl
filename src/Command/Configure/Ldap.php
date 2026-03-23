@@ -14,6 +14,7 @@ namespace Horde\Hordectl\Command\Configure;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
 use Horde\Injector\Injector;
@@ -21,7 +22,7 @@ use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use RuntimeException;
 use Exception;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Configure LDAP connection and settings
@@ -43,13 +44,15 @@ class Ldap implements Module, ModuleUsage
     use ModuleTrait;
     use ConfigureHelperTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private ConfigManager $configManager;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->configManager = $dependencies->getInstance(ConfigManager::class);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
@@ -214,7 +217,7 @@ class Ldap implements Module, ModuleUsage
                 $this->cli->writeln();
                 if (!$this->testConnectionWithConfig($helper->getAll(), $opts)) {
                     $this->cli->writeln();
-                    $this->cli->message('Connection test failed. Configuration not saved.', 'cli.error');
+                    $this->output->error('Connection test failed. Configuration not saved.');
                     return false;
                 }
             }
@@ -222,8 +225,8 @@ class Ldap implements Module, ModuleUsage
             // Save configuration
             $this->cli->writeln();
             $helper->save();
-            $this->cli->message('✓ LDAP configuration saved', 'cli.success');
-            $this->cli->message('  Backup created: ' . basename($helper->getBackupFile()), 'cli.message');
+            $this->output->ok('LDAP configuration saved');
+            $this->output->info('Backup created: ' . basename($helper->getBackupFile()));
             $this->cli->writeln();
 
             return true;
@@ -379,10 +382,7 @@ class Ldap implements Module, ModuleUsage
         }
 
         if (isset($opts->bindpw)) {
-            $this->cli->message(
-                'Warning: Bind password in command line is visible in process list',
-                'cli.warning'
-            );
+            $this->output->warn('Bind password in command line is visible in process list');
             $helper->setValue('ldap.bind_password', $opts->bindpw);
             $this->cli->writeln('  Bind password: ********');
         }
@@ -413,7 +413,7 @@ class Ldap implements Module, ModuleUsage
         $ldap = $helper->getValue('ldap');
 
         if (empty($ldap)) {
-            $this->cli->message('No LDAP configuration found.', 'cli.warning');
+            $this->output->warn('No LDAP configuration found.');
             $this->cli->writeln();
             return;
         }
@@ -464,7 +464,7 @@ class Ldap implements Module, ModuleUsage
     private function testConnectionWithConfig(array $config, object $opts): bool
     {
         if (!isset($config['ldap'])) {
-            $this->cli->message('✗ No LDAP configuration found', 'cli.error');
+            $this->output->error('No LDAP configuration found');
             return false;
         }
 
@@ -472,7 +472,7 @@ class Ldap implements Module, ModuleUsage
 
         // Check for ldap extension
         if (!extension_loaded('ldap')) {
-            $this->cli->message('✗ LDAP extension not loaded', 'cli.error');
+            $this->output->error('LDAP extension not loaded');
             $this->cli->writeln('  Install php-ldap extension to use LDAP functionality');
             return false;
         }
@@ -480,7 +480,7 @@ class Ldap implements Module, ModuleUsage
         // Validate required fields
         $host = $ldap['hostspec'] ?? null;
         if (!$host) {
-            $this->cli->message('✗ LDAP host not configured', 'cli.error');
+            $this->output->error('LDAP host not configured');
             return false;
         }
 
@@ -498,7 +498,7 @@ class Ldap implements Module, ModuleUsage
             // Connect
             $conn = @ldap_connect($uri);
             if ($conn === false) {
-                $this->cli->message('✗ Failed to connect to LDAP server', 'cli.error');
+                $this->output->error('Failed to connect to LDAP server');
                 return false;
             }
 
@@ -510,7 +510,7 @@ class Ldap implements Module, ModuleUsage
             // Start TLS if requested
             if ($tls) {
                 if (!@ldap_start_tls($conn)) {
-                    $this->cli->message('✗ Failed to start TLS', 'cli.error');
+                    $this->output->error('Failed to start TLS');
                     $this->cli->writeln('  Error: ' . ldap_error($conn));
                     ldap_unbind($conn);
                     return false;
@@ -524,7 +524,7 @@ class Ldap implements Module, ModuleUsage
             if ($bindDn) {
                 $this->cli->writeln("  Binding as: {$bindDn}");
                 if (!@ldap_bind($conn, $bindDn, $bindPw)) {
-                    $this->cli->message('✗ LDAP bind failed', 'cli.error');
+                    $this->output->error('LDAP bind failed');
                     $this->cli->writeln('  Error: ' . ldap_error($conn));
                     ldap_unbind($conn);
                     return false;
@@ -532,14 +532,14 @@ class Ldap implements Module, ModuleUsage
             } else {
                 $this->cli->writeln('  Binding anonymously');
                 if (!@ldap_bind($conn)) {
-                    $this->cli->message('✗ LDAP anonymous bind failed', 'cli.error');
+                    $this->output->error('LDAP anonymous bind failed');
                     $this->cli->writeln('  Error: ' . ldap_error($conn));
                     ldap_unbind($conn);
                     return false;
                 }
             }
 
-            $this->cli->message('✓ LDAP connection and bind successful', 'cli.success');
+            $this->output->ok('LDAP connection and bind successful');
 
             // Test search if requested
             if (isset($opts->search)) {
@@ -549,7 +549,7 @@ class Ldap implements Module, ModuleUsage
             ldap_unbind($conn);
             return true;
         } catch (Exception $e) {
-            $this->cli->message('✗ LDAP test failed', 'cli.error');
+            $this->output->error('LDAP test failed');
             $this->cli->writeln('  Error: ' . $e->getMessage());
             return false;
         }
@@ -569,7 +569,7 @@ class Ldap implements Module, ModuleUsage
 
         $baseDn = $ldap['basedn'] ?? '';
         if (empty($baseDn)) {
-            $this->cli->message('  Warning: No base DN configured', 'cli.warning');
+            $this->output->warn('No base DN configured');
             return;
         }
 
@@ -589,7 +589,7 @@ class Ldap implements Module, ModuleUsage
 
         $result = @ldap_search($conn, $baseDn, $filter);
         if ($result === false) {
-            $this->cli->message('  ✗ Search failed', 'cli.error');
+            $this->output->error('Search failed');
             $this->cli->writeln('    Error: ' . ldap_error($conn));
             return;
         }
@@ -598,9 +598,9 @@ class Ldap implements Module, ModuleUsage
         $count = $entries['count'] ?? 0;
 
         if ($count === 0) {
-            $this->cli->message("  ✗ No entries found for user: {$searchUser}", 'cli.warning');
+            $this->output->warn("No entries found for user: {$searchUser}");
         } else {
-            $this->cli->message("  ✓ Found {$count} entry/entries", 'cli.success');
+            $this->output->ok("Found {$count} entry/entries");
             if ($count > 0 && isset($entries[0]['dn'])) {
                 $this->cli->writeln("    DN: {$entries[0]['dn']}");
             }

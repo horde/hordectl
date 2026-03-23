@@ -5,8 +5,9 @@ namespace Horde\Hordectl\Command;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 
 /**
  * Version command - displays hordectl version information
@@ -15,12 +16,14 @@ class Version implements Module, ModuleUsage
 {
     use ModuleTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
     }
 
     /**

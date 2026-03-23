@@ -4,13 +4,14 @@ namespace Horde\Hordectl\Command\Import;
 
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
-use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
+use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Horde\Argv\Parser;
-use Horde_Cli;
 use RuntimeException;
 
 /**
@@ -24,13 +25,15 @@ class User implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -73,7 +76,7 @@ class User implements Module, ModuleUsage
         $items = $tree['apps']['builtin']['resources']['user']['items'] ?? [];
 
         if (empty($items)) {
-            $this->cli->message('No users to import', 'cli.warning');
+            $this->output->warn('No users to import');
             return true;
         }
 
@@ -87,7 +90,7 @@ class User implements Module, ModuleUsage
             $username = $item['userUid'] ?? null;
 
             if (!$username) {
-                $this->cli->message('Skipping user item without userUid', 'cli.warning');
+                $this->output->warn('Skipping user item without userUid');
                 $skipped++;
                 continue;
             }
@@ -108,16 +111,10 @@ class User implements Module, ModuleUsage
                     // Delete user
                     if ($exists) {
                         $this->apiClient->deleteUser($username);
-                        $this->cli->message(
-                            sprintf('Deleted user: %s', $username),
-                            'cli.success'
-                        );
+                        $this->output->ok(sprintf('Deleted user: %s', $username));
                         $deleted++;
                     } else {
-                        $this->cli->message(
-                            sprintf('User "%s" already absent', $username),
-                            'cli.warning'
-                        );
+                        $this->output->warn(sprintf('User "%s" already absent', $username));
                         $skipped++;
                     }
                 } elseif ($state === 'present') {
@@ -134,13 +131,10 @@ class User implements Module, ModuleUsage
                             if ($identityResult['errors'] > 0) {
                                 $msg .= sprintf(' (%d errors)', $identityResult['errors']);
                             }
-                            $this->cli->message($msg, 'cli.success');
+                            $this->output->ok($msg);
                             $updated++;
                         } else {
-                            $this->cli->message(
-                                sprintf('User "%s" already exists - no changes needed', $username),
-                                'cli.warning'
-                            );
+                            $this->output->warn(sprintf('User "%s" already exists - no changes needed', $username));
                             $skipped++;
                         }
                     } else {
@@ -148,10 +142,7 @@ class User implements Module, ModuleUsage
                         $password = $item['password'] ?? null;
 
                         if (!$password) {
-                            $this->cli->message(
-                                sprintf('User "%s" has no password - cannot create', $username),
-                                'cli.warning'
-                            );
+                            $this->output->warn(sprintf('User "%s" has no password - cannot create', $username));
                             $skipped++;
                             continue;
                         }
@@ -165,28 +156,22 @@ class User implements Module, ModuleUsage
                         if ($identityResult['errors'] > 0) {
                             $msg .= sprintf(' (%d errors)', $identityResult['errors']);
                         }
-                        $this->cli->message($msg, 'cli.success');
+                        $this->output->ok($msg);
                         $created++;
                     }
                 } else {
-                    $this->cli->message(
-                        sprintf('Invalid state "%s" for user "%s" - must be "present" or "absent"', $state, $username),
-                        'cli.error'
-                    );
+                    $this->output->error(sprintf('Invalid state "%s" for user "%s" - must be "present" or "absent"', $state, $username));
                     $errors++;
                 }
             } catch (RuntimeException $e) {
-                $this->cli->message(
-                    sprintf('Error importing user "%s": %s', $username, $e->getMessage()),
-                    'cli.error'
-                );
+                $this->output->error(sprintf('Error importing user "%s": %s', $username, $e->getMessage()));
                 $errors++;
             }
         }
 
         // Summary
         $this->cli->writeln();
-        $this->cli->message(
+        $this->output->info(
             sprintf(
                 'Import summary: %d created, %d updated, %d deleted, %d skipped, %d errors',
                 $created,
@@ -224,10 +209,7 @@ class User implements Module, ModuleUsage
                 $currentByIndex[$identity->index] = $identity;
             }
         } catch (RuntimeException $e) {
-            $this->cli->message(
-                sprintf('Warning: Failed to list identities for user "%s": %s', $username, $e->getMessage()),
-                'cli.warning'
-            );
+            $this->output->warn(sprintf('Failed to list identities for user "%s": %s', $username, $e->getMessage()));
             $stats['errors']++;
             return $stats;
         }
@@ -262,14 +244,13 @@ class User implements Module, ModuleUsage
                         $this->apiClient->deleteIdentity($username, $existingIndex);
                         $stats['deleted']++;
                     } catch (RuntimeException $e) {
-                        $this->cli->message(
+                        $this->output->warn(
                             sprintf(
-                                'Warning: Failed to delete identity "%s" for user "%s": %s',
+                                'Failed to delete identity "%s" for user "%s": %s',
                                 $identityId,
                                 $username,
                                 $e->getMessage()
-                            ),
-                            'cli.warning'
+                            )
                         );
                         $stats['errors']++;
                     }
@@ -285,27 +266,25 @@ class User implements Module, ModuleUsage
                             try {
                                 $this->apiClient->setDefaultIdentity($username, $existingIndex);
                             } catch (RuntimeException $e) {
-                                $this->cli->message(
+                                $this->output->warn(
                                     sprintf(
-                                        'Warning: Failed to set identity "%s" as default for user "%s": %s',
+                                        'Failed to set identity "%s" as default for user "%s": %s',
                                         $identityId,
                                         $username,
                                         $e->getMessage()
-                                    ),
-                                    'cli.warning'
+                                    )
                                 );
                                 $stats['errors']++;
                             }
                         }
                     } catch (RuntimeException $e) {
-                        $this->cli->message(
+                        $this->output->warn(
                             sprintf(
-                                'Warning: Failed to update identity "%s" for user "%s": %s',
+                                'Failed to update identity "%s" for user "%s": %s',
                                 $identityId,
                                 $username,
                                 $e->getMessage()
-                            ),
-                            'cli.warning'
+                            )
                         );
                         $stats['errors']++;
                     }
@@ -319,27 +298,25 @@ class User implements Module, ModuleUsage
                             try {
                                 $this->apiClient->setDefaultIdentity($username, $newIdentity->index);
                             } catch (RuntimeException $e) {
-                                $this->cli->message(
+                                $this->output->warn(
                                     sprintf(
-                                        'Warning: Failed to set identity "%s" as default for user "%s": %s',
+                                        'Failed to set identity "%s" as default for user "%s": %s',
                                         $identityId,
                                         $username,
                                         $e->getMessage()
-                                    ),
-                                    'cli.warning'
+                                    )
                                 );
                                 $stats['errors']++;
                             }
                         }
                     } catch (RuntimeException $e) {
-                        $this->cli->message(
+                        $this->output->warn(
                             sprintf(
-                                'Warning: Failed to create identity "%s" for user "%s": %s',
+                                'Failed to create identity "%s" for user "%s": %s',
                                 $identityId,
                                 $username,
                                 $e->getMessage()
-                            ),
-                            'cli.warning'
+                            )
                         );
                         $stats['errors']++;
                     }

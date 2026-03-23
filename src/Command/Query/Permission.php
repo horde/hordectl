@@ -2,16 +2,17 @@
 
 namespace Horde\Hordectl\Command\Query;
 
+use Exception;
+use Horde_Cli_Modular_Module as Module;
+use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
-use Exception;
-use Horde_Cli;
 use RuntimeException;
 
 /**
@@ -25,13 +26,15 @@ class Permission implements Module, ModuleUsage
     use TargetCapabilityTrait;
     use AdminApiClientTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
     private AdminApiClient $apiClient;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->parser = $dependencies->getInstance(Parser::class);
         // We stop parsing after the first positional
         $this->parser->allowInterspersedArgs = false;
@@ -89,23 +92,20 @@ class Permission implements Module, ModuleUsage
         } catch (RuntimeException $e) {
             // Check if it's a 404 error (permission not found)
             if (strpos($e->getMessage(), 'PERMISSION_NOT_FOUND') !== false) {
-                $this->cli->message(
-                    sprintf('Permission "%s" not found', $argv[1] ?? 'unknown'),
-                    'cli.error'
+                $this->output->error(
+                    sprintf('Permission "%s" not found', $argv[1] ?? 'unknown')
                 );
             } else {
-                $this->cli->message(
-                    sprintf('Error querying permissions: %s', $e->getMessage()),
-                    'cli.error'
+                $this->output->error(
+                    sprintf('Error querying permissions: %s', $e->getMessage())
                 );
                 // Re-throw for debugging
                 throw $e;
             }
             return false;
         } catch (Exception $e) {
-            $this->cli->message(
-                sprintf('Error querying permissions: %s', $e->getMessage()),
-                'cli.error'
+            $this->output->error(
+                sprintf('Error querying permissions: %s', $e->getMessage())
             );
             // Re-throw for debugging
             throw $e;

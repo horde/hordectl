@@ -7,8 +7,9 @@ namespace Horde\Hordectl\Command;
 use Horde\Argv\Parser;
 use Horde\Hordectl\HasModulesTrait;
 use Horde\Hordectl\HordectlModuleTrait;
+use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
-use Horde_Cli;
+use Horde\Cli\Cli as HordeCli;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 
@@ -35,12 +36,14 @@ class Target implements Module, ModuleUsage
     use HordectlModuleTrait;
     use HasModulesTrait;
 
-    protected Horde_Cli $cli;
+    protected HordeCli $cli;
+    protected Output $output;
 
     public function __construct(Injector $dependencies)
     {
         $this->dependencies = $dependencies;
-        $this->cli = $dependencies->getInstance('\Horde_Cli');
+        $this->cli = $dependencies->getInstance(HordeCli::class);
+        $this->output = $dependencies->createOutput($this->cli);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
 
