@@ -26,7 +26,7 @@ use Horde\Cli\Cli as HordeCli;
  * This command provides subcommands for configuring various Horde subsystems
  * like database, authentication, preferences, etc.
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class Configure implements Module, ModuleUsage
 {

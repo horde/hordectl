@@ -37,7 +37,7 @@ use Horde\Cli\Cli as HordeCli;
  *   hordectl configure ldap --host ldap.example.com ...
  *   hordectl configure ldap --test             # Test connection
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class Ldap implements Module, ModuleUsage
 {

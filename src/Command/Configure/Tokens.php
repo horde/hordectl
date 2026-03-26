@@ -35,7 +35,7 @@ use Horde\Cli\Cli as HordeCli;
  *   hordectl configure tokens --show             # Show current config
  *   hordectl configure tokens --driver sql ...   # CLI mode
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class Tokens implements Module, ModuleUsage
 {

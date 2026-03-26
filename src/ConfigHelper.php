@@ -28,7 +28,7 @@ use InvalidArgumentException;
  * - Creates automatic backups
  * - Works without Horde bootstrap (perfect for minimal mode)
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class ConfigHelper
 {
