@@ -85,7 +85,8 @@ class Cli implements Module
     public static function main(array $parameters = [])
     {
         // Use modern Horde\Cli\Cli
-        $cli = new HordeCli(['pager' => true]);
+        // NOTE: pager => false because pagers buffer output and break interactive prompts
+        $cli = new HordeCli(['pager' => false]);
 
         // Setup dependencies (no Horde bootstrap - target-based approach only)
         $dependencies = new Dependencies(new TopLevel());
@@ -200,6 +201,7 @@ class Cli implements Module
             'configure' => 'Configure Horde subsystems and settings',
             'help' => 'Show help and usage information',
             'import' => 'Import resources into Horde from YAML',
+            'install' => 'Install Horde by downloading latest horde/bundle',
             'patch' => 'Modify individual Horde resources',
             'query' => 'Query and export Horde resources as YAML',
             'secret' => 'Manage admin_secret for REST API authentication',

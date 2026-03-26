@@ -1,4 +1,4 @@
----
+B---
 id: hordectl
 name: Hordectl
 full: Scenario deployer library
@@ -30,6 +30,7 @@ dependencies:
       horde/injector: ^3
       horde/cli_modular: ^3
       horde/cli: ^3
+      horde/http: ^3
       horde/argv: ^3
       horde/yaml: ^3
       horde/group: ^3
