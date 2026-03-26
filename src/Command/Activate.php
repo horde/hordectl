@@ -32,7 +32,7 @@ use Horde\Cli\Cli as HordeCli;
  *   hordectl activate           # Copy conf.php.dist to conf.php
  *   hordectl activate --force   # Overwrite existing conf.php
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class Activate implements Module, ModuleUsage
 {

@@ -13,6 +13,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use RuntimeException;
 use stdClass;
+use ReflectionMethod;
 
 /**
  * Test the Create User command
@@ -116,7 +117,7 @@ class UserTest extends TestCase
         $user = new User($this->mockInjector);
 
         // Use reflection to call protected method
-        $method = new \ReflectionMethod($user, 'displayInteractiveHeader');
+        $method = new ReflectionMethod($user, 'displayInteractiveHeader');
         $method->invoke($user);
 
         // Verify exact sequence of writeln calls
@@ -137,7 +138,7 @@ class UserTest extends TestCase
         $opts = new stdClass();
         $opts->username = 'alice';
 
-        $method = new \ReflectionMethod($user, 'getUsername');
+        $method = new ReflectionMethod($user, 'getUsername');
         $result = $method->invoke($user, $opts, false);
 
         $this->assertEquals('alice', $result);
@@ -173,7 +174,7 @@ class UserTest extends TestCase
 
         $opts = new stdClass();
 
-        $method = new \ReflectionMethod($user, 'getUsername');
+        $method = new ReflectionMethod($user, 'getUsername');
         $result = $method->invoke($user, $opts, true);
 
         $this->assertEquals('bob', $result);
@@ -188,7 +189,7 @@ class UserTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('--username required');
 
-        $method = new \ReflectionMethod($user, 'getUsername');
+        $method = new ReflectionMethod($user, 'getUsername');
         $method->invoke($user, $opts, false);
     }
 
@@ -199,7 +200,7 @@ class UserTest extends TestCase
         $opts = new stdClass();
 
         // Should not throw
-        $method = new \ReflectionMethod($user, 'validatePasswordOptions');
+        $method = new ReflectionMethod($user, 'validatePasswordOptions');
         $method->invoke($user, $opts);
 
         $this->assertTrue(true);  // If we get here, test passed
@@ -213,7 +214,7 @@ class UserTest extends TestCase
         $opts->password = 'secret';
 
         // Should not throw
-        $method = new \ReflectionMethod($user, 'validatePasswordOptions');
+        $method = new ReflectionMethod($user, 'validatePasswordOptions');
         $method->invoke($user, $opts);
 
         $this->assertTrue(true);
@@ -227,7 +228,7 @@ class UserTest extends TestCase
         $opts->random_password = true;
 
         // Should not throw
-        $method = new \ReflectionMethod($user, 'validatePasswordOptions');
+        $method = new ReflectionMethod($user, 'validatePasswordOptions');
         $method->invoke($user, $opts);
 
         $this->assertTrue(true);
@@ -244,7 +245,7 @@ class UserTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Cannot specify both --password and --random-password');
 
-        $method = new \ReflectionMethod($user, 'validatePasswordOptions');
+        $method = new ReflectionMethod($user, 'validatePasswordOptions');
         $method->invoke($user, $opts);
     }
 
@@ -252,7 +253,7 @@ class UserTest extends TestCase
     {
         $user = new User($this->mockInjector);
 
-        $method = new \ReflectionMethod($user, 'generateRandomPassword');
+        $method = new ReflectionMethod($user, 'generateRandomPassword');
         $password = $method->invoke($user, 16);
 
         $this->assertEquals(16, strlen($password));
@@ -262,7 +263,7 @@ class UserTest extends TestCase
     {
         $user = new User($this->mockInjector);
 
-        $method = new \ReflectionMethod($user, 'generateRandomPassword');
+        $method = new ReflectionMethod($user, 'generateRandomPassword');
         $password1 = $method->invoke($user);
         $password2 = $method->invoke($user);
 
@@ -276,7 +277,7 @@ class UserTest extends TestCase
         $opts = new stdClass();
         $opts->password = 'mypassword';
 
-        $method = new \ReflectionMethod($user, 'getPassword');
+        $method = new ReflectionMethod($user, 'getPassword');
         $result = $method->invoke($user, $opts, false);
 
         $this->assertEquals('mypassword', $result['password']);
@@ -293,7 +294,7 @@ class UserTest extends TestCase
         $opts = new stdClass();
         $opts->random_password = true;
 
-        $method = new \ReflectionMethod($user, 'getPassword');
+        $method = new ReflectionMethod($user, 'getPassword');
         $result = $method->invoke($user, $opts, false);
 
         $this->assertNotEmpty($result['password']);
@@ -330,7 +331,7 @@ class UserTest extends TestCase
 
         $opts = new stdClass();
 
-        $method = new \ReflectionMethod($user, 'getPassword');
+        $method = new ReflectionMethod($user, 'getPassword');
         $result = $method->invoke($user, $opts, true);
 
         $this->assertEquals('interactive-pass', $result['password']);
@@ -346,7 +347,7 @@ class UserTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('--password or --random-password required');
 
-        $method = new \ReflectionMethod($user, 'getPassword');
+        $method = new ReflectionMethod($user, 'getPassword');
         $method->invoke($user, $opts, false);
     }
 
@@ -354,7 +355,7 @@ class UserTest extends TestCase
     {
         $user = new User($this->mockInjector);
 
-        $method = new \ReflectionMethod($user, 'displayGeneratedPassword');
+        $method = new ReflectionMethod($user, 'displayGeneratedPassword');
         $method->invoke($user, 'xK9mP2nQ4rT7sW1v');
 
         // Should have 3 writeln calls + 1 yellow call
@@ -381,7 +382,7 @@ class UserTest extends TestCase
     {
         $user = new User($this->mockInjector);
 
-        $method = new \ReflectionMethod($user, 'isInteractive');
+        $method = new ReflectionMethod($user, 'isInteractive');
         $result = $method->invoke($user);
 
         // In test environment, this depends on how tests are run
@@ -413,7 +414,7 @@ class UserTest extends TestCase
 
         $user = new User($mockInjector);
 
-        $method = new \ReflectionMethod($user, 'promptPassword');
+        $method = new ReflectionMethod($user, 'promptPassword');
         $result = $method->invoke($user);
 
         $this->assertEquals('matching-pass', $result);
@@ -454,7 +455,7 @@ class UserTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Passwords do not match');
 
-        $method = new \ReflectionMethod($user, 'promptPassword');
+        $method = new ReflectionMethod($user, 'promptPassword');
         $method->invoke($user);
     }
 

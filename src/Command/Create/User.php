@@ -112,8 +112,8 @@ class User implements Module, ModuleUsage
         if ($this->userExists($userData['username'])) {
             $this->cli->fatal(
                 sprintf(
-                    "Error: User '%s' already exists\n" .
-                    "Use 'hordectl patch user %s <password>' to update the password",
+                    "Error: User '%s' already exists\n"
+                    . "Use 'hordectl patch user %s <password>' to update the password",
                     $userData['username'],
                     $userData['username']
                 )

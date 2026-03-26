@@ -39,7 +39,7 @@ use Horde\Cli\Cli as HordeCli;
  *   hordectl configure database --type mysql ...   # CLI mode
  *   hordectl configure database --test             # Test current config
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class Database implements Module, ModuleUsage
 {
@@ -309,7 +309,7 @@ class Database implements Module, ModuleUsage
             $helper->setValue('sql.hostspec', $host);
 
             // Determine default port based on database type
-            $defaultPort = match($type) {
+            $defaultPort = match ($type) {
                 'pgsql' => 5432,
                 'mysql' => 3306,
                 default => null

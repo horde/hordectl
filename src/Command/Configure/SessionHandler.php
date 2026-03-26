@@ -35,7 +35,7 @@ use Horde\Cli\Cli as HordeCli;
  *   hordectl configure session --show                    # Show current config
  *   hordectl configure session --type file ...           # CLI mode
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 class SessionHandler implements Module, ModuleUsage
 {

@@ -24,7 +24,7 @@ use Exception;
  * Provides reusable functionality for boolean parsing, formatting,
  * and user prompts.
  *
- * @author Ralf Lang <lang@b1-systems.de>
+ * @author Ralf Lang <ralf.lang@ralf-lang.de>
  */
 trait ConfigureHelperTrait
 {
