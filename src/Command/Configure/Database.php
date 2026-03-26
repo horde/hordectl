@@ -260,19 +260,24 @@ class Database implements Module, ModuleUsage
         $this->cli->writeln('=========================================');
         $this->cli->writeln();
 
+        // Save old type BEFORE any prompts for port default logic
+        $oldType = $helper->getValue('sql.phptype') ?? 'mysql';
+
         // Database type
-        $currentType = $helper->getValue('sql.phptype') ?? 'mysql';
+        $currentType = $oldType;
         $type = $this->cli->prompt(
-            'Database type [mysql/pgsql/sqlite]:',
-            $currentType
+            prompt: 'Database type [mysql/pgsql/sqlite]:',
+            choices: null,
+            default: $currentType
         );
         $helper->setValue('sql.phptype', $type);
 
         // For SQLite, only need the database path
         if ($type === 'sqlite') {
             $database = $this->cli->prompt(
-                'Database file path:',
-                $helper->getValue('sql.database') ?? '/var/www/horde/horde.db'
+                prompt: 'Database file path:',
+                choices: null,
+                default: $helper->getValue('sql.database') ?? '/var/www/horde/horde.db'
             );
             $helper->setValue('sql.database', $database);
             return;
@@ -280,28 +285,48 @@ class Database implements Module, ModuleUsage
 
         // Host or socket
         $useSocket = $this->cli->prompt(
-            'Use Unix socket? [y/N]:',
-            'n'
+            prompt: 'Use Unix socket? [y/N]:',
+            choices: null,
+            default: 'n'
         );
 
         if (strtolower($useSocket) === 'y') {
             $socket = $this->cli->prompt(
-                'Socket path:',
-                $helper->getValue('sql.socket') ?? '/var/run/mysqld/mysqld.sock'
+                prompt: 'Socket path:',
+                choices: null,
+                default: $helper->getValue('sql.socket') ?? '/var/run/mysqld/mysqld.sock'
             );
             $helper->setValue('sql.socket', $socket);
+            $helper->setValue('sql.protocol', 'unix');
             $helper->unsetValue('sql.hostspec');
             $helper->unsetValue('sql.port');
         } else {
             $host = $this->cli->prompt(
-                'Database host:',
-                $helper->getValue('sql.hostspec') ?? 'localhost'
+                prompt: 'Database host:',
+                choices: null,
+                default: $helper->getValue('sql.hostspec') ?? 'localhost'
             );
             $helper->setValue('sql.hostspec', $host);
 
+            // Determine default port based on database type
+            $defaultPort = match($type) {
+                'pgsql' => 5432,
+                'mysql' => 3306,
+                default => null
+            };
+
+            // If database type changed from saved config, use new type's defaults
+            // Otherwise, use saved values
+            $typeChanged = ($oldType !== $type);
+
+            $portDefault = $typeChanged
+                ? $defaultPort
+                : ($helper->getValue('sql.port') ?? $defaultPort);
+
             $port = $this->cli->prompt(
-                'Database port (leave empty for default):',
-                (string) ($helper->getValue('sql.port') ?? '')
+                prompt: 'Database port:',
+                choices: null,
+                default: (string) ($portDefault ?? '')
             );
             if ($port !== '') {
                 $helper->setValue('sql.port', (int) $port);
@@ -309,13 +334,15 @@ class Database implements Module, ModuleUsage
                 $helper->unsetValue('sql.port');
             }
 
+            $helper->setValue('sql.protocol', 'tcp');
             $helper->unsetValue('sql.socket');
         }
 
         // Username
         $username = $this->cli->prompt(
-            'Database username:',
-            $helper->getValue('sql.username') ?? 'horde'
+            prompt: 'Database username:',
+            choices: null,
+            default: $helper->getValue('sql.username') ?? 'horde'
         );
         $helper->setValue('sql.username', $username);
 
@@ -328,28 +355,19 @@ class Database implements Module, ModuleUsage
 
         // Database name
         $database = $this->cli->prompt(
-            'Database name:',
-            $helper->getValue('sql.database') ?? 'horde'
+            prompt: 'Database name:',
+            choices: null,
+            default: $helper->getValue('sql.database') ?? 'horde'
         );
         $helper->setValue('sql.database', $database);
 
         // Character set
         $charset = $this->cli->prompt(
-            'Character set:',
-            $helper->getValue('sql.charset') ?? 'utf8mb4'
+            prompt: 'Character set:',
+            choices: null,
+            default: $helper->getValue('sql.charset') ?? 'utf8mb4'
         );
         $helper->setValue('sql.charset', $charset);
-
-        // Protocol (optional)
-        $protocol = $this->cli->prompt(
-            'Protocol (leave empty for default):',
-            $helper->getValue('sql.protocol') ?? ''
-        );
-        if ($protocol !== '') {
-            $helper->setValue('sql.protocol', $protocol);
-        } else {
-            $helper->unsetValue('sql.protocol');
-        }
     }
 
     /**
