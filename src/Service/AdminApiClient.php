@@ -271,13 +271,14 @@ class AdminApiClient
      * @return User Created user object
      * @throws RuntimeException on API error
      */
-    public function createUser(string $username, string $password): User
+    public function createUser(string $username, string $password, bool $skipIdentity = false): User
     {
         $factory = new CreateUserRequestFactory(
             $this->config,
             $this->requestFactory,
             $username,
-            $password
+            $password,
+            $skipIdentity
         );
 
         $request = $factory->create();

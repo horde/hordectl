@@ -1,6 +1,7 @@
 <?php
 
 namespace Horde\Hordectl\Command\Test;
+use Horde\Hordectl\Exception\TestModuleException;
 
 use Horde\Argv\Parser;
 use Horde\Cli\Cli as HordeCli;
@@ -43,8 +44,27 @@ class All implements Module, ModuleUsage
             return false;
         }
 
-        // Check target capability and create API client
-        $target = $this->requireApiCapability();
+        // Check if target has API endpoint configured
+        $target = $this->getActiveTarget();
+        if (!$target->supportsApiCommands()) {
+            $this->cli->writeln();
+            $this->output->warn('Test skipped: API endpoint not configured');
+            $this->cli->writeln();
+            $this->cli->writeln('The all-subsystems test requires a configured Horde web endpoint.');
+            $this->cli->writeln();
+            $this->cli->writeln('To configure the endpoint:');
+            $this->cli->writeln('  1. Activate your Horde installation:');
+            $this->cli->writeln('     hordectl activate');
+            $this->cli->writeln();
+            $this->cli->writeln('  2. Add the web endpoint to your target:');
+            $this->cli->writeln("     hordectl target update {$target->name} --endpoint=http://localhost/horde");
+            $this->cli->writeln();
+            $this->cli->writeln('  3. Generate an admin secret:');
+            $this->cli->writeln('     hordectl secret generate');
+            $this->cli->writeln();
+            return true;  // Handled but skipped (not a failure)
+        }
+
         $this->apiClient = $this->createApiClientFromTarget($target);
 
         $this->cli->writeln();
@@ -80,7 +100,11 @@ class All implements Module, ModuleUsage
             return true;
         } catch (Exception $e) {
             $this->displayApiError($e);
-            return true;
+            throw new TestModuleException(
+                "All tests failed: {$e->getMessage()}",
+                0,
+                $e
+            );
         }
     }
 }

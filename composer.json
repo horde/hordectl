@@ -50,5 +50,7 @@
         "branch-alias": {
             "dev-FRAMEWORK_6_0": "1.x-dev"
         }
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }

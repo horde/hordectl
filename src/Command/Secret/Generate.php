@@ -7,9 +7,13 @@ namespace Horde\Hordectl\Command\Secret;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
 use Horde\Cli\Cli as HordeCli;
+use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\ConfigFileWriter;
+use Horde\Hordectl\Target;
+use Horde\Hordectl\TargetCapabilityTrait;
+use Horde\Hordectl\TargetResolver;
 use Horde\Injector\Injector;
 use Exception;
 use RuntimeException;
@@ -29,6 +33,7 @@ use RuntimeException;
 class Generate implements Module, ModuleUsage
 {
     use ModuleTrait;
+    use TargetCapabilityTrait;
 
     protected HordeCli $cli;
     protected Output $output;
@@ -77,22 +82,30 @@ class Generate implements Module, ModuleUsage
         $this->output->ok('Generating admin_secret for hordectl REST API...');
         $this->cli->writeln();
 
-        // Find Horde installation
-        $hordeDir = $this->getHordeDir($args);
-        if (!$hordeDir) {
-            $this->cli->writeln();
-            $this->output->error('Could not find Horde installation');
-            $this->cli->writeln();
-            $this->cli->writeln('Please specify the installation root directory:');
-            $this->cli->writeln('  hordectl secret generate --installation-root-dir=/var/www/horde');
-            $this->cli->writeln();
-            $this->cli->writeln('The installation root is the directory containing composer.json');
-            $this->cli->writeln('and vendor/horde/horde subdirectory.');
-            $this->cli->writeln();
-            return;
+        // Determine installation directory and target
+        $installDir = null;
+        $target = null;
+        $overrideDir = $this->getInstallationRootDirOverride($args);
+
+        if ($overrideDir) {
+            // Use explicit override
+            $installDir = $overrideDir;
+            $this->cli->writeln('Using installation root: ' . $installDir);
+        } else {
+            // Use target system
+            try {
+                $target = $this->requireFilesystemCapability();
+                $installDir = $target->hordeInstallDir;
+                $this->cli->writeln('Using target: ' . $target->name);
+                $this->cli->writeln('Installation root: ' . $installDir);
+            } catch (Exception $e) {
+                $this->showNoTargetError();
+                return;
+            }
         }
 
-        $confPath = $hordeDir . '/vendor/horde/horde/config/conf.php';
+        // Construct correct conf.php path (bundle style)
+        $confPath = $installDir . '/var/config/horde/conf.php';
 
         // Check if conf.php exists
         if (!file_exists($confPath)) {
@@ -101,12 +114,12 @@ class Generate implements Module, ModuleUsage
             $this->cli->writeln();
             $this->cli->writeln("Expected: {$confPath}");
             $this->cli->writeln();
-            $this->cli->writeln('Make sure Horde is properly installed and configured.');
+            $this->cli->writeln('Make sure Horde is properly installed and activated.');
+            $this->cli->writeln('Run: hordectl activate');
             $this->cli->writeln();
             return;
         }
 
-        $this->cli->writeln('Installation root: ' . $hordeDir);
         $this->cli->writeln('Config file: ' . $confPath);
         $this->cli->writeln();
 
@@ -148,6 +161,12 @@ class Generate implements Module, ModuleUsage
             $this->configWriter->writeAdminSecret($confPath, $secret);
             $this->configWriter->enableAdminApi($confPath);
 
+            // Auto-sync to target config for local targets
+            if ($target !== null && $target->isLocal()) {
+                $this->cli->writeln('Syncing secret to target config...');
+                $this->syncSecretToTarget($target, $secret);
+            }
+
             $this->cli->writeln();
             if ($existingSecret) {
                 $this->output->ok('SUCCESS: admin_secret rotated!');
@@ -161,31 +180,28 @@ class Generate implements Module, ModuleUsage
                 $this->cli->writeln('  ' . $secret);
             }
             $this->cli->writeln();
-            $this->output->warn('IMPORTANT: Store this secret securely!');
-            $this->cli->writeln();
-            $this->cli->writeln('This secret grants full administrative access to Horde.');
-            $this->cli->writeln('Do not share it or commit it to version control.');
-            $this->cli->writeln();
 
-            if ($existingSecret) {
-                $this->output->warn('Old hordectl connections will break immediately!');
+            if ($target !== null && $target->isLocal()) {
+                $this->output->ok('Target config updated automatically');
                 $this->cli->writeln();
-                $this->cli->writeln('Update ~/.hordectl/config.yml with the new secret:');
-                $this->cli->writeln();
-                $this->cli->writeln('  horde:');
-                $this->cli->writeln('    admin_secret: ' . $secret);
+                $this->cli->writeln("Target '{$target->name}' now has the new secret.");
+                $this->cli->writeln('You can immediately use API commands like:');
+                $this->cli->writeln('  hordectl test db');
+                $this->cli->writeln('  hordectl test cache');
                 $this->cli->writeln();
             } else {
-                $this->cli->writeln('Next steps:');
-                $this->cli->writeln('  1. Configure hordectl with this secret:');
-                $this->cli->writeln('     Create ~/.hordectl/config.yml:');
+                // Only show manual steps when using --installation-root-dir override
+                $this->output->warn('IMPORTANT: Store this secret securely!');
                 $this->cli->writeln();
-                $this->cli->writeln('     horde:');
-                $this->cli->writeln('       base_url: http://localhost/horde');
-                $this->cli->writeln('       admin_secret: ' . $secret);
+                $this->cli->writeln('This secret grants full administrative access to Horde.');
+                $this->cli->writeln('Do not share it or commit it to version control.');
+                $this->cli->writeln();
+                $this->cli->writeln('Next steps:');
+                $this->cli->writeln('  1. Update target with this secret:');
+                $this->cli->writeln('     hordectl target update <name> --secret=<secret>');
                 $this->cli->writeln();
                 $this->cli->writeln('  2. Test the connection:');
-                $this->cli->writeln('     hordectl info');
+                $this->cli->writeln('     hordectl test db');
                 $this->cli->writeln();
             }
         } catch (Exception $e) {
@@ -213,37 +229,68 @@ class Generate implements Module, ModuleUsage
     }
 
     /**
-     * Get Horde installation root directory from arguments
+     * Sync generated secret to target config
+     *
+     * Updates the target's adminSecret field in hordectl config.
+     *
+     * @param Target $target The target to update
+     * @param string $secret The new secret to sync
+     */
+    protected function syncSecretToTarget(Target $target, string $secret): void
+    {
+        $config = new ConfigManager();
+        $resolver = new TargetResolver();
+
+        // Create updated target with new secret
+        $updatedTarget = new Target(
+            name: $target->name,
+            type: $target->type,
+            hordeBase: $target->hordeBase,
+            hordeInstallDir: $target->hordeInstallDir,
+            endpoint: $target->endpoint,
+            adminSecret: $secret,
+            verifySsl: $target->verifySsl,
+            description: $target->description,
+            autoDetected: $target->autoDetected,
+            fromEnv: $target->fromEnv
+        );
+
+        $resolver->saveTarget($config, $updatedTarget);
+    }
+
+    /**
+     * Get installation root directory override from arguments
      *
      * @param array $args Command arguments
-     * @return string|null Horde installation root path or null
+     * @return string|null Installation root path or null
      */
-    protected function getHordeDir(array $args): ?string
+    protected function getInstallationRootDirOverride(array $args): ?string
     {
         foreach ($args as $arg) {
             if (str_starts_with($arg, '--installation-root-dir=')) {
                 return substr($arg, strlen('--installation-root-dir='));
             }
         }
-
-        // Try to find Horde installation automatically
-        // Look for directory containing composer.json and vendor/horde/horde subdirectory
-        $paths = [
-            getcwd(),
-            '/var/www/horde',
-            '/usr/share/horde',
-            dirname(getcwd()), // Parent directory
-        ];
-
-        foreach ($paths as $path) {
-            // Check for composer.json and vendor/horde/horde/config/conf.php
-            if (file_exists($path . '/composer.json')
-                && file_exists($path . '/vendor/horde/horde/config/conf.php')) {
-                return $path;
-            }
-        }
-
         return null;
+    }
+
+    /**
+     * Show error when no target is configured
+     */
+    protected function showNoTargetError(): void
+    {
+        $this->cli->writeln();
+        $this->output->error('No active target configured');
+        $this->cli->writeln();
+        $this->cli->writeln('Please either:');
+        $this->cli->writeln('  1. Add and set a target:');
+        $this->cli->writeln('       hordectl target add mysite --type=local --path=/var/www/horde');
+        $this->cli->writeln('       hordectl target use mysite');
+        $this->cli->writeln('       hordectl secret generate');
+        $this->cli->writeln();
+        $this->cli->writeln('  2. Specify installation path directly:');
+        $this->cli->writeln('       hordectl secret generate --installation-root-dir=/var/www/horde');
+        $this->cli->writeln();
     }
 
     /**
@@ -276,21 +323,17 @@ class Generate implements Module, ModuleUsage
         return [
             'Generate or rotate admin_secret for hordectl REST API authentication',
             '',
-            'Generates a cryptographically random 128-character secret',
-            'and writes it to Horde\'s conf.php configuration file.',
-            '',
-            'If a secret already exists, you must use --force to replace it.',
-            'Re-running with --force rotates the secret (useful for periodic rotation).',
+            'Uses the current target to locate conf.php and write the secret.',
+            'Generates a cryptographically random 128-character secret.',
             '',
             'Usage:',
-            '  hordectl secret generate                    # First-time generation',
+            '  hordectl secret generate                    # Use current target',
             '  hordectl secret generate --force            # Rotate existing secret',
-            '  hordectl secret generate --installation-root-dir=/var/www/horde',
+            '  hordectl secret generate --installation-root-dir=/var/www/horde  # Override',
             '',
             'Options:',
             '  --force                      Replace existing secret (rotation)',
-            '  --installation-root-dir      Path to Horde installation root',
-            '                               (directory with composer.json, auto-detected)',
+            '  --installation-root-dir      Override: use this path instead of current target',
         ];
     }
 }

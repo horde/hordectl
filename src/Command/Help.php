@@ -60,7 +60,12 @@ class Help implements Module, ModuleUsage
     {
         // Check if user asked for help on a specific command
         if (isset($argv[1]) && !empty($argv[1])) {
-            $this->showCommandHelp($argv[1]);
+            // Check for subcommand: help create user
+            if (isset($argv[2]) && !empty($argv[2])) {
+                $this->showSubcommandHelp($argv[1], $argv[2]);
+            } else {
+                $this->showCommandHelp($argv[1]);
+            }
             return;
         }
 
@@ -129,6 +134,69 @@ class Help implements Module, ModuleUsage
             $this->cli->writeln(str_repeat('=', strlen('Command: ' . $commandName)));
             $this->cli->writeln();
 
+            // Check if command has submodules (HasModulesTrait)
+            if (method_exists($command, 'listModules')) {
+                // Command has submodules - show parent help via getUsageDescription or direct output
+                if (method_exists($command, 'getUsageDescription')) {
+                    $description = $command->getUsageDescription();
+                    if (is_array($description)) {
+                        foreach ($description as $line) {
+                            $this->cli->writeln($line);
+                        }
+                    } else {
+                        $this->cli->writeln($description);
+                    }
+                    $this->cli->writeln();
+                    return;
+                }
+
+                // Fallback: show generic subcommand help
+                if (method_exists($command, 'getUsage')) {
+                    $this->cli->writeln($command->getUsage());
+                    $this->cli->writeln();
+                }
+
+                $this->cli->writeln("Available subcommands:");
+                $this->cli->writeln();
+
+                foreach ($command->listModules() as $module) {
+                    // Get primary name - prefer getPositionalArgs over getTitle
+                    if (method_exists($module, 'getPositionalArgs')) {
+                        $positionals = $module->getPositionalArgs();
+                        $name = !empty($positionals) ? $positionals[0] : null;
+                    } else {
+                        $name = null;
+                    }
+
+                    if ($name === null && method_exists($module, 'getTitle')) {
+                        $name = $module->getTitle();
+                    }
+
+                    if ($name === null) {
+                        $name = '(unknown)';
+                    }
+
+                    // Try getSummary, then getUsage, then generic message
+                    if (method_exists($module, 'getSummary')) {
+                        $summary = $module->getSummary();
+                    } elseif (method_exists($module, 'getUsage')) {
+                        $usage = $module->getUsage();
+                        // Extract first line if multiline
+                        $summary = explode("\n", $usage)[0];
+                    } else {
+                        $summary = '';
+                    }
+
+                    $this->cli->writeln('  ' . str_pad($name, 15) . $summary);
+                }
+
+                $this->cli->writeln();
+                $this->cli->writeln("For subcommand-specific help:");
+                $this->cli->writeln("  hordectl {$commandName} <subcommand> --help");
+                $this->cli->writeln();
+                return;
+            }
+
             // Check if command has detailed usage description
             if (method_exists($command, 'getUsageDescription')) {
                 $description = $command->getUsageDescription();
@@ -152,6 +220,80 @@ class Help implements Module, ModuleUsage
                 $this->cli->writeln('No detailed help available for this command.');
                 $this->cli->writeln();
             }
+        } catch (Exception $e) {
+            $this->output->error('Error loading command: ' . $e->getMessage());
+            $this->cli->writeln();
+        }
+    }
+
+    /**
+     * Display help for a specific subcommand
+     *
+     * @param string $commandName Parent command name
+     * @param string $subcommandName Subcommand name
+     */
+    protected function showSubcommandHelp(string $commandName, string $subcommandName): void
+    {
+        // Try to load the parent command
+        $className = 'Horde\\Hordectl\\Command\\' . ucfirst($commandName);
+
+        if (!class_exists($className)) {
+            $this->output->error(sprintf('Unknown command: %s', $commandName));
+            $this->cli->writeln();
+            return;
+        }
+
+        try {
+            $command = new $className($this->dependencies);
+
+            // Check if command has submodules
+            if (!method_exists($command, 'listModules')) {
+                $this->output->error(sprintf('Command "%s" has no subcommands', $commandName));
+                $this->cli->writeln();
+                return;
+            }
+
+            // Find the subcommand module
+            foreach ($command->listModules() as $module) {
+                // Try getTitle() first, then getPositionalArgs()
+                $matches = [];
+                if (method_exists($module, 'getTitle')) {
+                    $matches[] = $module->getTitle();
+                }
+                if (method_exists($module, 'getPositionalArgs')) {
+                    $matches = array_merge($matches, $module->getPositionalArgs());
+                }
+
+                if (in_array($subcommandName, $matches)) {
+                    // Found it - show its help
+                    $this->cli->writeln();
+                    $this->cli->writeln("Command: {$commandName} {$subcommandName}");
+                    $this->cli->writeln(str_repeat('=', strlen("Command: {$commandName} {$subcommandName}")));
+                    $this->cli->writeln();
+
+                    if (method_exists($module, 'getUsageDescription')) {
+                        $description = $module->getUsageDescription();
+                        if (is_array($description)) {
+                            foreach ($description as $line) {
+                                $this->cli->writeln($line);
+                            }
+                        } else {
+                            $this->cli->writeln($description);
+                        }
+                    } elseif (method_exists($module, 'getUsage')) {
+                        $this->cli->writeln($module->getUsage());
+                    }
+
+                    $this->cli->writeln();
+                    return;
+                }
+            }
+
+            // Subcommand not found
+            $this->output->error(sprintf('Unknown subcommand: %s %s', $commandName, $subcommandName));
+            $this->cli->writeln();
+            $this->cli->writeln("Run 'hordectl help {$commandName}' to see available subcommands.");
+            $this->cli->writeln();
         } catch (Exception $e) {
             $this->output->error('Error loading command: ' . $e->getMessage());
             $this->cli->writeln();

@@ -30,12 +30,14 @@ class CreateUserRequestFactory
      * @param RequestFactoryInterface $requestFactory PSR-17 request factory
      * @param string $username Username to create
      * @param string $password User password
+     * @param bool $skipIdentity Skip creating default identity
      */
     public function __construct(
         private AdminApiConfig $config,
         private RequestFactoryInterface $requestFactory,
         private string $username,
-        private string $password
+        private string $password,
+        private bool $skipIdentity = false
     ) {}
 
     /**
@@ -57,6 +59,7 @@ class CreateUserRequestFactory
         $body = json_encode([
             'username' => $this->username,
             'password' => $this->password,
+            'skip_identity' => $this->skipIdentity,
         ]);
 
         $stream = $request->getBody();

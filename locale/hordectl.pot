@@ -1,0 +1,15 @@
+# Hordectl Translation Template
+# Copyright 2013-2026 The Horde Project (http://www.horde.org/)
+# This file is distributed under the same license as the hordectl package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Hordectl\n"
+"Report-Msgid-Bugs-To: dev@lists.horde.org\n"
+"POT-Creation-Date: 2026-03-26 13:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"

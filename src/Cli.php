@@ -82,7 +82,7 @@ class Cli implements Module
     }
 
     // Setup a Horde_Cli_Modular, a Parser, setup self as root module
-    public static function main(array $parameters = [])
+    public static function main(array $parameters = []): int
     {
         // Use modern Horde\Cli\Cli
         // NOTE: pager => false because pagers buffer output and break interactive prompts
@@ -114,6 +114,7 @@ class Cli implements Module
             foreach ($CliModule->listModules() as $module) {
                 $cli->writeln(Horde_String::lower($module->getTitle()));
             }
+            return 0;
         }
 
         // Fetch the cli module's direct parameters and run its handle method
@@ -124,7 +125,14 @@ class Cli implements Module
             $dependencies->setInstance('hordectl.target_override', $globalOpts[0]->override_target);
         }
 
-        $CliModule->handle($globalOpts[1]);
+        try {
+            $result = $CliModule->handle($globalOpts[1]);
+            return $result ? 0 : 1;
+        } catch (\Horde\Hordectl\Exception\ModuleException $e) {
+            // Module handled command but it failed
+            // Error already displayed by module
+            return 1;
+        }
     }
 
     public function handle(array $argv = []): bool

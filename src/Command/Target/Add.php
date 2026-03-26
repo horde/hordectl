@@ -173,12 +173,28 @@ class Add implements Module
             $hordeBase = $path . '/vendor/horde/horde';
         }
 
+        // Validate endpoint if provided
+        $endpoint = $opts['endpoint'] ?? null;
+        if ($endpoint !== null) {
+            $validEndpoint = $this->validateEndpoint($endpoint);
+            if ($validEndpoint === null) {
+                $this->cli->fatal('Could not validate endpoint. Tested both ' . $endpoint . '/observability/readiness and ' . $endpoint . '/horde/observability/readiness');
+                return null;
+            }
+            $endpoint = $validEndpoint;
+            if ($validEndpoint !== $opts['endpoint']) {
+                $this->cli->writeln();
+                $this->output->info('Endpoint auto-corrected to: ' . $validEndpoint);
+                $this->cli->writeln();
+            }
+        }
+
         return new Target(
             name: $name,
             type: TargetType::Local,
             hordeBase: $hordeBase,
             hordeInstallDir: $path,
-            endpoint: $opts['endpoint'] ?? null,
+            endpoint: $endpoint,
             adminSecret: $opts['secret'],
             verifySsl: $opts['verify_ssl'],
             description: $opts['description'] !== '' ? $opts['description'] : null
@@ -197,6 +213,19 @@ class Add implements Module
             $this->cli->fatal("Missing --secret for remote target. Use --secret=<value>");
         }
 
+        // Validate endpoint
+        $validEndpoint = $this->validateEndpoint($endpoint);
+        if ($validEndpoint === null) {
+            $this->cli->fatal('Could not validate endpoint. Tested both ' . $endpoint . '/observability/readiness and ' . $endpoint . '/horde/observability/readiness');
+            return null;
+        }
+        $endpoint = $validEndpoint;
+        if ($validEndpoint !== $opts['endpoint']) {
+            $this->cli->writeln();
+            $this->output->info('Endpoint auto-corrected to: ' . $validEndpoint);
+            $this->cli->writeln();
+        }
+
         return new Target(
             name: $name,
             type: TargetType::Remote,
@@ -207,6 +236,40 @@ class Add implements Module
             verifySsl: $opts['verify_ssl'],
             description: $opts['description'] !== '' ? $opts['description'] : null
         );
+    }
+
+    /**
+     * Validate endpoint by testing observability/readiness route
+     *
+     * Tests both the literal URL and URL+"/horde"
+     *
+     * @param string $endpoint Base endpoint URL
+     * @return string|null Valid endpoint or null if both failed
+     */
+    protected function validateEndpoint(string $endpoint): ?string
+    {
+        $endpoint = rtrim($endpoint, '/');
+        $candidates = [
+            $endpoint,
+            $endpoint . '/horde'
+        ];
+
+        foreach ($candidates as $candidate) {
+            $url = $candidate . '/observability/readiness';
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response === '1') {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     protected function generateTargetName(string $type, array $opts): string

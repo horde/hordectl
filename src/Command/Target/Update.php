@@ -7,6 +7,7 @@ namespace Horde\Hordectl\Command\Target;
 use Horde\Argv\Parser;
 use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\ConfigManager;
+use Horde\Hordectl\Exception\TargetModuleException;
 use Horde\Hordectl\Exception\TargetNotFoundException;
 use Horde\Hordectl\HordectlModuleTrait;
 use Horde\Hordectl\Output;
@@ -129,7 +130,31 @@ class Update implements Module
 
         // Update endpoint (empty string removes it)
         if (isset($opts['endpoint'])) {
-            $endpoint = $opts['endpoint'] !== '' ? $opts['endpoint'] : null;
+            if ($opts['endpoint'] !== '') {
+                // Validate endpoint by testing observability/readiness
+                $validEndpoint = $this->validateEndpoint($opts['endpoint']);
+                if ($validEndpoint === null) {
+                    $this->cli->writeln();
+                    $this->output->warn('Could not validate endpoint');
+                    $this->cli->writeln('Tested:');
+                    $this->cli->writeln('  ' . $opts['endpoint'] . '/observability/readiness');
+                    $this->cli->writeln('  ' . $opts['endpoint'] . '/horde/observability/readiness');
+                    $this->cli->writeln();
+                    $this->cli->writeln('Both failed. Please check the URL and that Horde is accessible.');
+                    $this->cli->writeln();
+                    throw new TargetModuleException(
+                        "Endpoint validation failed: {$opts['endpoint']}"
+                    );
+                }
+                $endpoint = $validEndpoint;
+                if ($validEndpoint !== $opts['endpoint']) {
+                    $this->cli->writeln();
+                    $this->output->info('Endpoint auto-corrected to: ' . $validEndpoint);
+                    $this->cli->writeln();
+                }
+            } else {
+                $endpoint = null;
+            }
         }
 
         // Update secret
@@ -154,5 +179,39 @@ class Update implements Module
             autoDetected: $existing->autoDetected,
             fromEnv: $existing->fromEnv
         );
+    }
+
+    /**
+     * Validate endpoint by testing observability/readiness route
+     *
+     * Tests both the literal URL and URL+"/horde"
+     *
+     * @param string $endpoint Base endpoint URL
+     * @return string|null Valid endpoint or null if both failed
+     */
+    protected function validateEndpoint(string $endpoint): ?string
+    {
+        $endpoint = rtrim($endpoint, '/');
+        $candidates = [
+            $endpoint,
+            $endpoint . '/horde'
+        ];
+
+        foreach ($candidates as $candidate) {
+            $url = $candidate . '/observability/readiness';
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response === '1') {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }
