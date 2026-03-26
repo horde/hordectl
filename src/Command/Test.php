@@ -64,26 +64,23 @@ class Test implements Module, ModuleUsage
             return true;
         }
 
-        // Run the subcommand tests - stop after first handler
-        $res = false;
+        // Run the subcommand tests - delegate to submodules
         foreach ($this->listModules() as $module) {
             $handled = $module->handle($moduleArgs);
             if ($handled) {
-                $res = true;
-                break;  // Stop after first module handles it
+                // Module claimed and handled - return success
+                // (exceptions will bubble if it failed)
+                return true;
             }
         }
 
-        // If no subcommand handled the request, show help
-        if (!$res) {
-            $this->cli->writeln();
-            $this->output->error(
-                sprintf('Unknown test subsystem: %s', $moduleArgs[0])
-            );
-            $this->showHelp();
-        }
-
-        return true;
+        // No subcommand handled the request
+        $this->cli->writeln();
+        $this->output->error(
+            sprintf('Unknown test subsystem: %s', $moduleArgs[0])
+        );
+        $this->showHelp();
+        return false;
     }
 
     /**

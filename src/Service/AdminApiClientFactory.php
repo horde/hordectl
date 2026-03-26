@@ -46,10 +46,51 @@ class AdminApiClientFactory
             );
         }
 
+        // For local targets, auto-load secret from conf.php if not in target config
+        $adminSecret = $target->adminSecret;
+        if ($target->isLocal() && ($adminSecret === null || $adminSecret === '')) {
+            $confPath = $target->hordeInstallDir . '/var/config/horde/conf.php';
+
+            if (!file_exists($confPath)) {
+                throw new RuntimeException(
+                    "Cannot load admin_secret: Configuration file not found at {$confPath}\n"
+                    . "\nOptions:\n"
+                    . "  1. Activate Horde: hordectl activate\n"
+                    . "  2. Generate secret: hordectl secret generate"
+                );
+            }
+
+            $conf = [];
+            require $confPath;
+            $adminSecret = $conf['admin_api']['admin_secret'] ?? null;
+
+            if ($adminSecret === null || $adminSecret === '') {
+                throw new RuntimeException(
+                    "admin_secret not configured in {$confPath}\n"
+                    . "\nOptions:\n"
+                    . "  1. Generate secret: hordectl secret generate\n"
+                    . "  2. Sync from conf.php: hordectl target sync-secret {$target->name}\n"
+                    . "  3. Set manually: hordectl target update {$target->name} --secret=YOUR_SECRET"
+                );
+            }
+        }
+
+        // Validate we have a secret before creating config
+        if ($adminSecret === null || $adminSecret === '') {
+            throw new RuntimeException(
+                "admin_secret not configured for target '{$target->name}'\n"
+                . "\nFor remote targets:\n"
+                . "  hordectl target update {$target->name} --secret=YOUR_SECRET\n"
+                . "\nFor local targets:\n"
+                . "  1. Generate: hordectl secret generate\n"
+                . "  2. Sync: hordectl target sync-secret {$target->name}"
+            );
+        }
+
         // Create API config from target
         $apiConfig = new AdminApiConfig(
             endpoint: $target->endpoint,
-            adminSecret: $target->adminSecret
+            adminSecret: $adminSecret
         );
 
         // Create HTTP client (PSR-18)

@@ -137,6 +137,14 @@ class SessionHandler implements Module, ModuleUsage
                 ]
             ),
             new Option(
+                '--cookie-domain',
+                [
+                    'action' => 'store',
+                    'type' => 'string',
+                    'help' => 'Cookie domain (empty string for localhost)',
+                ]
+            ),
+            new Option(
                 '--interactive',
                 [
                     'action' => 'store_true',
@@ -218,7 +226,8 @@ class SessionHandler implements Module, ModuleUsage
     {
         return isset($opts->type) || isset($opts->path) || isset($opts->memcache)
                || isset($opts->timeout) || isset($opts->gc_maxlifetime) || isset($opts->gc_probability)
-               || isset($opts->use_cookies) || isset($opts->cookie_secure) || isset($opts->cookie_httponly);
+               || isset($opts->use_cookies) || isset($opts->cookie_secure) || isset($opts->cookie_httponly)
+               || isset($opts->cookie_domain);
     }
 
     /**
@@ -389,6 +398,12 @@ class SessionHandler implements Module, ModuleUsage
             $value = $this->parseBoolean($opts->cookie_httponly);
             $helper->setValue('sessionhandler.cookie_httponly', $value);
             $this->cli->writeln("  HttpOnly cookies: " . ($value ? 'yes' : 'no'));
+        }
+
+        if (isset($opts->cookie_domain)) {
+            $helper->setValue('cookie.domain', $opts->cookie_domain);
+            $displayValue = $opts->cookie_domain === '' ? '(empty - for localhost)' : $opts->cookie_domain;
+            $this->cli->writeln("  Cookie domain: " . $displayValue);
         }
     }
 

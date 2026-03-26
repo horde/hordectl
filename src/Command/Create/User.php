@@ -87,6 +87,20 @@ class User implements Module, ModuleUsage
                     'help' => 'Email address (optional)',
                 ]
             ),
+            new Option(
+                '--auto-password',
+                [
+                    'action' => 'store_true',
+                    'help' => 'Automatically generate random password (skip prompt)',
+                ]
+            ),
+            new Option(
+                '--skip-identity',
+                [
+                    'action' => 'store_true',
+                    'help' => 'Skip creating default identity (useful if prefs not configured)',
+                ]
+            ),
         ];
     }
 
@@ -122,7 +136,8 @@ class User implements Module, ModuleUsage
 
         // Create user
         try {
-            $this->createUser($userData);
+            $skipIdentity = $opts->skip_identity ?? false;
+            $this->createUser($userData, $skipIdentity);
             $this->output->ok(
                 sprintf("User '%s' created successfully", $userData['username'])
             );
@@ -156,8 +171,11 @@ class User implements Module, ModuleUsage
         // Password
         if (!empty($opts->password)) {
             $data['password'] = $opts->password;
+        } elseif ($opts->auto_password ?? false) {
+            $data['password'] = $this->generateRandomPassword();
+            $this->cli->writeln("Generated password: " . $data['password']);
         } elseif (!$interactive) {
-            $this->cli->fatal("Error: --password required (not running interactively)");
+            $this->cli->fatal("Error: --password or --auto-password required (not running interactively)");
         } else {
             $data['password'] = $this->promptPassword();
         }
@@ -230,14 +248,28 @@ class User implements Module, ModuleUsage
         }
     }
 
-    protected function createUser(array $userData): void
+    protected function createUser(array $userData, bool $skipIdentity = false): void
     {
         // AdminApiClient::createUser currently only accepts username and password
         // TODO: Extend API to support fullname and email
         $this->apiClient->createUser(
             $userData['username'],
-            $userData['password']
+            $userData['password'],
+            $skipIdentity
         );
+    }
+
+    protected function generateRandomPassword(int $length = 16): string
+    {
+        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-/!@#$%^&*';
+        $password = '';
+        $maxIndex = strlen($chars) - 1;
+
+        for ($i = 0; $i < $length; $i++) {
+            $password .= $chars[random_int(0, $maxIndex)];
+        }
+
+        return $password;
     }
 
     public function getUsage(): string
@@ -261,7 +293,9 @@ class User implements Module, ModuleUsage
             '',
             'Options:',
             '  --username <name>       Username (required)',
-            '  --password <pass>       Password (required)',
+            '  --password <pass>       Password (required, or use --auto-password)',
+            '  --auto-password         Generate random password automatically',
+            '  --skip-identity         Skip creating default identity',
             '  --fullname <name>       Full name (optional)',
             '  --email <address>       Email address (optional)',
             '',
@@ -271,6 +305,7 @@ class User implements Module, ModuleUsage
             'Examples:',
             '  hordectl create user',
             '  hordectl create user --username admin --password SecurePass123',
+            '  hordectl create user --username testuser --auto-password',
             '  hordectl create user --username alice --password secret --email alice@example.com',
         ];
     }

@@ -14,8 +14,13 @@ namespace Horde\Hordectl\Command;
 use Horde\Argv\Option;
 use Horde\Argv\Parser;
 use Horde\Cli\Cli as HordeCli;
+use Horde\Hordectl\ConfigManager;
+use Horde\Hordectl\Exception\TargetAlreadyExistsException;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\Output;
+use Horde\Hordectl\Target;
+use Horde\Hordectl\TargetResolver;
+use Horde\Hordectl\TargetType;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
@@ -203,6 +208,9 @@ class Install implements Module, ModuleUsage
 
             $this->output->ok('Composer install completed');
 
+            // Auto-create local target for this installation
+            $this->createLocalTarget($installDir);
+
             // Success message
             $this->cli->writeln();
             $this->output->ok('Horde installation complete!');
@@ -211,14 +219,14 @@ class Install implements Module, ModuleUsage
             $this->cli->writeln("  Version: $latestTag");
             $this->cli->writeln();
             $this->cli->writeln('Next steps:');
-            $this->cli->writeln('  1. Add this installation as a target:');
-            $this->cli->writeln("     hordectl target add mysite --type=local --path=$installDir");
-            $this->cli->writeln();
-            $this->cli->writeln('  2. Activate the installation:');
+            $this->cli->writeln('  1. Activate the installation:');
             $this->cli->writeln('     hordectl activate');
             $this->cli->writeln();
-            $this->cli->writeln('  3. Configure database:');
+            $this->cli->writeln('  2. Configure database:');
             $this->cli->writeln('     hordectl configure database');
+            $this->cli->writeln();
+            $this->cli->writeln('  3. Generate admin secret:');
+            $this->cli->writeln('     hordectl secret generate');
             $this->cli->writeln();
 
             return true;
@@ -393,7 +401,7 @@ class Install implements Module, ModuleUsage
 
         $output = [];
         $return = 0;
-        $cmd = "cd " . escapeshellarg($installDir) . " && $composerBin install --no-dev 2>&1";
+        $cmd = "cd " . escapeshellarg($installDir) . " && COMPOSER_ALLOW_SUPERUSER=1 $composerBin install 2>&1";
         exec($cmd, $output, $return);
 
         if ($return !== 0) {
@@ -435,6 +443,58 @@ class Install implements Module, ModuleUsage
         }
 
         return file_put_contents($composerFile, $json . "\n") !== false;
+    }
+
+    /**
+     * Create local target for the installed Horde
+     *
+     * @param string $installDir Installation directory path
+     */
+    private function createLocalTarget(string $installDir): void
+    {
+        $this->cli->writeln();
+        $this->output->info('Creating local target...');
+
+        // Generate target name from install directory
+        $targetName = basename($installDir);
+
+        $config = new ConfigManager();
+        $resolver = new TargetResolver();
+
+        // Check if target already exists
+        try {
+            $existing = $resolver->getTarget($config, $targetName);
+            $this->cli->writeln("Target '{$targetName}' already exists, skipping creation.");
+            $this->cli->writeln("Run: hordectl target use {$targetName}");
+            return;
+        } catch (TargetAlreadyExistsException $e) {
+            // Target exists, skip
+            $this->cli->writeln("Target '{$targetName}' already exists, skipping creation.");
+            return;
+        } catch (\Exception $e) {
+            // Target doesn't exist, continue to create it
+        }
+
+        // Create new local target (no endpoint yet - Horde not configured)
+        $target = new Target(
+            name: $targetName,
+            type: TargetType::Local,
+            hordeBase: null,
+            hordeInstallDir: $installDir,
+            endpoint: null,
+            adminSecret: null,
+            verifySsl: true,
+            description: "Auto-created by install command",
+            autoDetected: false,
+            fromEnv: false
+        );
+
+        $resolver->saveTarget($config, $target);
+        $resolver->setCurrentTarget($config, $targetName);
+
+        $this->output->ok("Target '{$targetName}' created and activated");
+        $this->cli->writeln("  Type: local");
+        $this->cli->writeln("  Path: {$installDir}");
     }
 
     /**
