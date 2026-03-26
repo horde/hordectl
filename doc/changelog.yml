@@ -1,4 +1,18 @@
 ---
+1.0.0-alpha11:
+  api: 1.0.0-alpha11
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-26
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: |-
+    style: php-cs-fixer
+    feat: usability improvements for the configure database command
+    feat: Use modern presentation layer for CLI
+    fix: don't commit hordectl.phar
 1.0.0-alpha10:
   api: 1.0.0-alpha10
   state:
