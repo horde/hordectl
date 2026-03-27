@@ -11,7 +11,7 @@
             "role": "lead"
         }
     ],
-    "time": "2026-03-26",
+    "time": "2026-03-27",
     "repositories": [],
     "require": {
         "php": "^8.2",
@@ -37,7 +37,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Horde\\Hordectl\\Test\\": "test/"
+            "Horde\\Hordectl\\Test\\": "test/",
+            "Horde\\Hordectl\\Test\\Fixtures\\": "test/fixtures/"
         }
     },
     "bin": [
@@ -50,7 +51,5 @@
         "branch-alias": {
             "dev-FRAMEWORK_6_0": "1.x-dev"
         }
-    },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+    }
 }
