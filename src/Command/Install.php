@@ -21,9 +21,16 @@ use Horde\Hordectl\Output;
 use Horde\Hordectl\Target;
 use Horde\Hordectl\TargetResolver;
 use Horde\Hordectl\TargetType;
+use Horde\Http\Client\Curl;
+use Horde\Http\Client\Options as HttpClientOptions;
+use Horde\Http\RequestFactory;
+use Horde\Http\ResponseFactory;
+use Horde\Http\StreamFactory;
 use Horde\Injector\Injector;
 use Horde_Cli_Modular_Module as Module;
 use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
 use RuntimeException;
 
 /**
@@ -43,6 +50,8 @@ class Install implements Module, ModuleUsage
 
     protected HordeCli $cli;
     protected Output $output;
+    protected ClientInterface $httpClient;
+    protected RequestFactoryInterface $requestFactory;
 
     public function __construct(Injector $dependencies)
     {
@@ -51,6 +60,15 @@ class Install implements Module, ModuleUsage
         $this->output = $dependencies->createOutput($this->cli);
         $this->_parser = $dependencies->getInstance(Parser::class);
         $this->_parser->allowInterspersedArgs = false;
+
+        // Initialize HTTP client for downloads
+        $clientOptions = new HttpClientOptions([
+            'timeout' => 120, // Longer timeout for large downloads
+        ]);
+        $responseFactory = new ResponseFactory();
+        $streamFactory = new StreamFactory();
+        $this->httpClient = new Curl($responseFactory, $streamFactory, $clientOptions);
+        $this->requestFactory = new RequestFactory();
     }
 
     public function getBaseOptions()
@@ -62,6 +80,22 @@ class Install implements Module, ModuleUsage
                     'action' => 'store',
                     'type' => 'string',
                     'help' => 'Directory to install Horde (required)',
+                ]
+            ),
+            new Option(
+                '--bundle-version',
+                [
+                    'action' => 'store',
+                    'type' => 'string',
+                    'help' => 'Bundle version to install (tag, branch, or commit hash). Default: latest tag',
+                ]
+            ),
+            new Option(
+                '--source',
+                [
+                    'action' => 'store',
+                    'type' => 'string',
+                    'help' => 'Bundle source (GitHub URL or local path). Default: https://github.com/horde/bundle',
                 ]
             ),
             new Option(
@@ -125,57 +159,104 @@ class Install implements Module, ModuleUsage
                 $this->output->ok("Created directory: $installDir");
             }
 
-            // Get latest tag from horde/bundle
-            $this->cli->writeln();
-            $this->output->info('Fetching latest horde/bundle release...');
+            // Parse source
+            $source = $opts->source ?? 'https://github.com/horde/bundle';
+            $parsedSource = $this->parseSourceUrl($source);
 
-            $latestTag = $this->getLatestBundleTag();
-            if (!$latestTag) {
+            if (!$parsedSource) {
                 $this->cli->writeln();
-                $this->output->warn('Could not determine latest horde/bundle version');
-                $this->cli->writeln('Please check your network connection or try again later.');
+                $this->output->warn("Invalid source: $source");
+                $this->cli->writeln('Source must be a GitHub URL or valid local path');
                 $this->cli->writeln();
                 return true;
             }
 
-            $this->cli->writeln("  Latest version: $latestTag");
+            // Determine version
+            $version = $opts->bundle_version ?? null;
+            if (!$version) {
+                $this->cli->writeln();
+                $this->output->info('Fetching latest bundle version...');
 
-            // Download URL for the tagged release
-            $downloadUrl = "https://github.com/horde/bundle/archive/refs/tags/{$latestTag}.tar.gz";
+                $version = $this->getLatestBundleTag($source);
+                if (!$version) {
+                    $this->cli->writeln();
+                    $this->output->warn('Could not determine latest version');
+                    $this->cli->writeln('Please specify a version with --bundle-version');
+                    $this->cli->writeln();
+                    return true;
+                }
+                $this->cli->writeln("  Latest version: $version");
+            }
 
             $this->cli->writeln();
-            $this->output->info('Downloading horde/bundle...');
-            $this->cli->writeln("  URL: $downloadUrl");
+            $this->output->info('Installing Horde bundle...');
+            $this->cli->writeln("  Source: $source");
+            $this->cli->writeln("  Version: $version");
 
-            // Download to temporary file
-            $tmpFile = tempnam(sys_get_temp_dir(), 'horde_bundle_');
-            if (!$this->downloadFile($downloadUrl, $tmpFile)) {
+            // Handle based on source type
+            if ($parsedSource['type'] === 'local') {
+                // Copy from local repository
+                $this->cli->writeln();
+                $this->output->info('Copying from local repository...');
+
+                if (!$this->copyLocalBundle($parsedSource['path'], $installDir, $version)) {
+                    $this->cli->writeln();
+                    $this->output->warn('Failed to copy from local repository');
+                    $this->cli->writeln();
+                    return true;
+                }
+
+                $this->output->ok('Copied successfully');
+            } else {
+                // Download from GitHub
+                $downloadUrl = $this->buildDownloadUrl($parsedSource, $version);
+                $archiveDirName = $this->getArchiveDirectoryName($parsedSource['repo'], $version);
+
+                $this->cli->writeln();
+                $this->output->info('Downloading bundle...');
+                $this->cli->writeln("  URL: $downloadUrl");
+
+                // Download to temporary file
+                $tmpFile = tempnam(sys_get_temp_dir(), 'horde_bundle_');
+                if (!$this->downloadFile($downloadUrl, $tmpFile)) {
+                    @unlink($tmpFile);
+                    $this->cli->writeln();
+                    $this->output->warn('Failed to download bundle');
+                    $this->cli->writeln("Could not download from: $downloadUrl");
+                    $this->cli->writeln();
+                    $this->cli->writeln('This may be because:');
+                    $this->cli->writeln('  - The version/ref does not exist');
+                    $this->cli->writeln('  - The repository is private or does not exist');
+                    $this->cli->writeln('  - Network connection issues');
+                    $this->cli->writeln();
+                    $this->cli->writeln('Please verify:');
+                    $this->cli->writeln("  - Version '$version' exists in the repository");
+                    $this->cli->writeln('  - The source URL is correct');
+                    $this->cli->writeln();
+                    return true;
+                }
+
+                $this->output->ok('Downloaded successfully');
+
+                // Extract archive
+                $this->cli->writeln();
+                $this->output->info('Extracting archive...');
+
+                // Check if URL is for a zip file
+                $isZip = str_ends_with($downloadUrl, '.zip');
+
+                if (!$this->extractArchive($tmpFile, $installDir, $archiveDirName, $isZip)) {
+                    @unlink($tmpFile);
+                    $this->cli->writeln();
+                    $this->output->warn('Failed to extract archive');
+                    $this->cli->writeln('The downloaded archive may be invalid. Please check the version exists.');
+                    $this->cli->writeln();
+                    return true;
+                }
+
                 @unlink($tmpFile);
-                $this->cli->writeln();
-                $this->output->warn('Failed to download horde/bundle');
-                $this->cli->writeln("Could not download from: $downloadUrl");
-                $this->cli->writeln('Please check your network connection or try again later.');
-                $this->cli->writeln();
-                return true;
+                $this->output->ok('Extracted successfully');
             }
-
-            $this->output->ok('Downloaded successfully');
-
-            // Extract archive
-            $this->cli->writeln();
-            $this->output->info('Extracting archive...');
-
-            if (!$this->extractTarGz($tmpFile, $installDir, $latestTag)) {
-                @unlink($tmpFile);
-                $this->cli->writeln();
-                $this->output->warn('Failed to extract archive');
-                $this->cli->writeln('The downloaded archive may be corrupted. Please try again.');
-                $this->cli->writeln();
-                return true;
-            }
-
-            @unlink($tmpFile);
-            $this->output->ok('Extracted successfully');
 
             // Set minimum-stability if requested
             if (isset($opts->stability)) {
@@ -211,12 +292,12 @@ class Install implements Module, ModuleUsage
             // Auto-create local target for this installation
             $this->createLocalTarget($installDir);
 
-            // Success message
             $this->cli->writeln();
             $this->output->ok('Horde installation complete!');
             $this->cli->writeln();
             $this->cli->writeln("  Installation directory: $installDir");
-            $this->cli->writeln("  Version: $latestTag");
+            $this->cli->writeln("  Source: $source");
+            $this->cli->writeln("  Version: $version");
             $this->cli->writeln();
             $this->cli->writeln('Next steps:');
             $this->cli->writeln('  1. Activate the installation:');
@@ -238,9 +319,6 @@ class Install implements Module, ModuleUsage
         }
     }
 
-    /**
-     * Show usage information when required parameters are missing
-     */
     protected function showUsage(): void
     {
         $this->cli->writeln();
@@ -254,56 +332,80 @@ class Install implements Module, ModuleUsage
         $this->cli->writeln('                              (must not exist or be empty)');
         $this->cli->writeln();
         $this->cli->writeln('Optional:');
+        $this->cli->writeln('  --bundle-version=<version>  Bundle version to install (tag, branch, or commit)');
+        $this->cli->writeln('                              Examples: 1.0.0-beta1, FRAMEWORK_6_0, abc1234');
+        $this->cli->writeln('                              Default: latest tag');
+        $this->cli->writeln();
+        $this->cli->writeln('  --source=<url>              Bundle source (GitHub URL or local path)');
+        $this->cli->writeln('                              Default: https://github.com/horde/bundle');
+        $this->cli->writeln('                              Examples:');
+        $this->cli->writeln('                                https://github.com/myorg/bundle');
+        $this->cli->writeln('                                ~/php/git/horde/bundle');
+        $this->cli->writeln();
         $this->cli->writeln('  --stability=<level>         Composer minimum-stability');
         $this->cli->writeln('                              (dev, alpha, beta, rc, stable)');
         $this->cli->writeln();
         $this->cli->writeln('Examples:');
         $this->cli->writeln('  hordectl install --install-dir=/var/www/horde');
         $this->cli->writeln('  hordectl install --install-dir=~/horde-test --stability=dev');
+        $this->cli->writeln('  hordectl install --install-dir=/tmp/test --bundle-version=1.0.0-beta1');
+        $this->cli->writeln('  hordectl install --install-dir=/tmp/test --source=~/php/git/horde/bundle');
         $this->cli->writeln();
         $this->cli->writeln('For more information, run: hordectl help install');
         $this->cli->writeln();
     }
 
     /**
-     * Get latest tag from local horde/bundle repository
+     * Get latest tag from bundle repository
      *
+     * @param string $source Source URL or path
      * @return string|null Latest tag or null if not found
      */
-    private function getLatestBundleTag(): ?string
+    private function getLatestBundleTag(string $source = 'https://github.com/horde/bundle'): ?string
     {
-        // First try local git repository
-        $bundleRepo = $_SERVER['HOME'] . '/php/git/horde/bundle';
-        if (is_dir($bundleRepo . '/.git')) {
+        // Parse source
+        $parsed = $this->parseSourceUrl($source);
+        if (!$parsed) {
+            return null;
+        }
+
+        // For local repositories, try git commands
+        if ($parsed['type'] === 'local') {
             $output = [];
             $return = 0;
-            exec("cd '$bundleRepo' && git fetch --tags 2>&1 && git tag --list | sort -V | tail -1", $output, $return);
+            exec("cd " . escapeshellarg($parsed['path']) . " && git tag --list | sort -V | tail -1 2>&1", $output, $return);
             if ($return === 0 && !empty($output)) {
                 return trim(end($output));
             }
-        }
-
-        // Fallback: use GitHub API
-        $apiUrl = 'https://api.github.com/repos/horde/bundle/tags';
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => "User-Agent: hordectl\r\n",
-            ],
-        ]);
-
-        $response = @file_get_contents($apiUrl, false, $context);
-        if ($response === false) {
             return null;
         }
 
-        $tags = json_decode($response, true);
-        if (!is_array($tags) || empty($tags)) {
-            return null;
+        // For GitHub, use API
+        if ($parsed['type'] === 'github') {
+            $apiUrl = sprintf('https://api.github.com/repos/%s/%s/tags', $parsed['user'], $parsed['repo']);
+
+            try {
+                $request = $this->requestFactory->createRequest('GET', $apiUrl)
+                    ->withHeader('User-Agent', 'hordectl');
+                $response = $this->httpClient->sendRequest($request);
+
+                if ($response->getStatusCode() !== 200) {
+                    return null;
+                }
+
+                $tags = json_decode((string) $response->getBody(), true);
+                if (!is_array($tags) || empty($tags)) {
+                    return null;
+                }
+
+                // Return first tag (most recent)
+                return $tags[0]['name'] ?? null;
+            } catch (\Exception $e) {
+                return null;
+            }
         }
 
-        // Return first tag (most recent)
-        return $tags[0]['name'] ?? null;
+        return null;
     }
 
     /**
@@ -315,48 +417,79 @@ class Install implements Module, ModuleUsage
      */
     private function downloadFile(string $url, string $destination): bool
     {
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => "User-Agent: hordectl\r\n",
-                'follow_location' => 1,
-            ],
-        ]);
+        try {
+            $request = $this->requestFactory->createRequest('GET', $url)
+                ->withHeader('User-Agent', 'hordectl');
+            $response = $this->httpClient->sendRequest($request);
 
-        $data = @file_get_contents($url, false, $context);
-        if ($data === false) {
+            if ($response->getStatusCode() !== 200) {
+                return false;
+            }
+
+            return file_put_contents($destination, (string) $response->getBody()) !== false;
+        } catch (\Exception $e) {
             return false;
         }
-
-        return file_put_contents($destination, $data) !== false;
     }
 
     /**
-     * Extract tar.gz archive
+     * Extract archive (tar.gz or zip)
      *
-     * @param string $archiveFile Path to tar.gz file
+     * @param string $archiveFile Path to archive file
      * @param string $destinationDir Destination directory
-     * @param string $version Version tag (for stripping top directory)
+     * @param string $archiveDirName Expected directory name in archive
+     * @param bool $isZip Whether the archive is a zip file
      * @return bool True on success
      */
-    private function extractTarGz(string $archiveFile, string $destinationDir, string $version): bool
-    {
-        // GitHub archives extract to bundle-{version}/ directory
+    private function extractArchive(
+        string $archiveFile,
+        string $destinationDir,
+        string $archiveDirName,
+        bool $isZip = false
+    ): bool {
+        // GitHub archives extract to {repo}-{version}/ directory
         // We need to extract and move contents up one level
         $tmpExtract = sys_get_temp_dir() . '/horde_extract_' . uniqid();
         mkdir($tmpExtract, 0o755, true);
 
-        $output = [];
-        $return = 0;
-        exec("tar -xzf " . escapeshellarg($archiveFile) . " -C " . escapeshellarg($tmpExtract) . " 2>&1", $output, $return);
-
-        if ($return !== 0) {
-            @rmdir($tmpExtract);
-            return false;
+        // Extract based on type
+        if ($isZip) {
+            // Use PHP's zip extension if available, fallback to unzip command
+            if (class_exists('ZipArchive')) {
+                $zip = new \ZipArchive();
+                if ($zip->open($archiveFile) !== true) {
+                    @rmdir($tmpExtract);
+                    return false;
+                }
+                if (!$zip->extractTo($tmpExtract)) {
+                    $zip->close();
+                    @rmdir($tmpExtract);
+                    return false;
+                }
+                $zip->close();
+            } else {
+                // Fallback to unzip command
+                $output = [];
+                $return = 0;
+                exec("unzip -q " . escapeshellarg($archiveFile) . " -d " . escapeshellarg($tmpExtract) . " 2>&1", $output, $return);
+                if ($return !== 0) {
+                    @rmdir($tmpExtract);
+                    return false;
+                }
+            }
+        } else {
+            // tar.gz
+            $output = [];
+            $return = 0;
+            exec("tar -xzf " . escapeshellarg($archiveFile) . " -C " . escapeshellarg($tmpExtract) . " 2>&1", $output, $return);
+            if ($return !== 0) {
+                @rmdir($tmpExtract);
+                return false;
+            }
         }
 
-        // Move contents from bundle-{version}/ to destination
-        $extractedDir = $tmpExtract . '/bundle-' . $version;
+        // Move contents from extracted directory to destination
+        $extractedDir = $tmpExtract . '/' . $archiveDirName;
         if (!is_dir($extractedDir)) {
             @rmdir($tmpExtract);
             return false;
@@ -446,6 +579,146 @@ class Install implements Module, ModuleUsage
     }
 
     /**
+     * Parse source URL into components
+     *
+     * @param string $source Source URL or path
+     * @return array|null ['type' => 'github'|'local', 'user' => string, 'repo' => string] or null if invalid
+     */
+    private function parseSourceUrl(string $source): ?array
+    {
+        // Check if it's a GitHub URL
+        if (preg_match('#^https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$#', $source, $matches)) {
+            return [
+                'type' => 'github',
+                'user' => $matches[1],
+                'repo' => $matches[2],
+            ];
+        }
+
+        // Check if it's a local path
+        if (!str_starts_with($source, 'http://') && !str_starts_with($source, 'https://')) {
+            // Expand ~ and relative paths
+            if (str_starts_with($source, '~/')) {
+                $source = $_SERVER['HOME'] . substr($source, 1);
+            } elseif (!str_starts_with($source, '/')) {
+                $source = getcwd() . '/' . $source;
+            }
+
+            $source = realpath($source);
+            if ($source && is_dir($source)) {
+                return [
+                    'type' => 'local',
+                    'path' => $source,
+                ];
+            }
+            return null; // Invalid local path
+        }
+
+        // Unsupported URL format
+        return null;
+    }
+
+    /**
+     * Build download URL for bundle
+     *
+     * @param array $source Parsed source from parseSourceUrl()
+     * @param string $version Version/ref to download
+     * @return string Download URL
+     */
+    private function buildDownloadUrl(array $source, string $version): string
+    {
+        if ($source['type'] === 'github') {
+            // GitHub archive URL: https://github.com/[user]/[repo]/archive/[ref].zip
+            return sprintf(
+                'https://github.com/%s/%s/archive/%s.zip',
+                $source['user'],
+                $source['repo'],
+                $version
+            );
+        }
+
+        throw new RuntimeException('Cannot build download URL for non-GitHub source');
+    }
+
+    /**
+     * Get directory name from extracted archive
+     *
+     * GitHub archives extract to: {repo}-{ref}/
+     * The ref is sanitized (e.g., "feat/name" becomes "feat-name")
+     *
+     * @param string $repo Repository name
+     * @param string $version Version/ref downloaded
+     * @return string Expected directory name
+     */
+    private function getArchiveDirectoryName(string $repo, string $version): string
+    {
+        // GitHub sanitizes ref names: replaces / with -
+        $sanitizedRef = str_replace('/', '-', $version);
+        return "{$repo}-{$sanitizedRef}";
+    }
+
+    /**
+     * Copy bundle from local repository
+     *
+     * @param string $localPath Path to local git repository
+     * @param string $installDir Destination directory
+     * @param string|null $version Optional version/ref to checkout
+     * @return bool True on success
+     */
+    private function copyLocalBundle(
+        string $localPath,
+        string $installDir,
+        ?string $version
+    ): bool {
+        // Use git archive if .git directory exists and version specified
+        if (is_dir($localPath . '/.git') && $version) {
+            $output = [];
+            $return = 0;
+
+            // Create temporary tar file
+            $tmpFile = tempnam(sys_get_temp_dir(), 'horde_local_');
+            $tarFile = $tmpFile . '.tar';
+            rename($tmpFile, $tarFile);
+
+            // Use git archive to export specific ref
+            $cmd = sprintf(
+                "cd %s && git archive --format=tar --output=%s %s 2>&1",
+                escapeshellarg($localPath),
+                escapeshellarg($tarFile),
+                escapeshellarg($version)
+            );
+            exec($cmd, $output, $return);
+
+            if ($return !== 0) {
+                @unlink($tarFile);
+                return false;
+            }
+
+            // Extract tar to destination
+            exec("tar -xf " . escapeshellarg($tarFile) . " -C " . escapeshellarg($installDir) . " 2>&1", $output, $return);
+            @unlink($tarFile);
+
+            return $return === 0;
+        }
+
+        // Otherwise, just copy files (excluding .git)
+        $output = [];
+        $return = 0;
+        exec("rsync -a --exclude='.git' " . escapeshellarg($localPath . '/') . " " . escapeshellarg($installDir . '/') . " 2>&1", $output, $return);
+
+        if ($return !== 0) {
+            // Fallback to cp if rsync not available
+            exec("cp -r " . escapeshellarg($localPath) . "/. " . escapeshellarg($installDir) . "/ 2>&1", $output, $return);
+            // Remove .git directory if copied
+            if ($return === 0 && is_dir($installDir . '/.git')) {
+                exec("rm -rf " . escapeshellarg($installDir . '/.git') . " 2>&1");
+            }
+        }
+
+        return $return === 0;
+    }
+
+    /**
      * Create local target for the installed Horde
      *
      * @param string $installDir Installation directory path
@@ -527,28 +800,68 @@ class Install implements Module, ModuleUsage
 
     public function getUsage()
     {
-        return 'install --install-dir=<directory>
+        return 'install --install-dir=<directory> [options]
 
-Install Horde by downloading the latest tagged release of horde/bundle
-and running composer install.
+Install Horde by downloading bundle from GitHub or copying from a local source,
+then running composer install.
 
 This command will:
   1. Create the installation directory if it doesn\'t exist
-  2. Download the latest tagged release from GitHub (horde/bundle)
+  2. Download or copy the bundle (default: latest tag from GitHub horde/bundle)
   3. Extract the archive
   4. Run composer install
+  5. Create a local target for the installation
 
 OPTIONS
     --install-dir=<directory>
         Directory where Horde will be installed (required)
         The directory must not exist or be empty
 
+    --bundle-version=<version>
+        Bundle version to install (tag, branch, or commit hash)
+        Examples: 1.0.0-beta1, FRAMEWORK_6_0, abc123def456
+        Default: latest tag
+
+    --source=<url|path>
+        Bundle source (GitHub URL or local path)
+        Default: https://github.com/horde/bundle
+        Examples:
+          https://github.com/myorg/bundle
+          ~/php/git/horde/bundle
+          /home/user/projects/bundle
+
+    --stability=<level>
+        Composer minimum-stability (dev, alpha, beta, rc, stable)
+        Use "dev" when installing development branches
+
 EXAMPLES
-    # Install to /var/www/horde
+    # Install latest version (default)
     hordectl install --install-dir=/var/www/horde
 
-    # Install to user directory
-    hordectl install --install-dir=~/horde-test
+    # Install specific tagged version
+    hordectl install --install-dir=/var/www/horde --bundle-version=1.0.0-beta1
+
+    # Install development branch
+    hordectl install --install-dir=/var/www/horde-dev \\
+        --bundle-version=FRAMEWORK_6_0 --stability=dev
+
+    # Install specific commit
+    hordectl install --install-dir=/tmp/test \\
+        --bundle-version=abc123def456789
+
+    # Install from local repository
+    hordectl install --install-dir=/tmp/test \\
+        --source=~/php/git/horde/bundle
+
+    # Install from fork
+    hordectl install --install-dir=/tmp/test \\
+        --source=https://github.com/myorg/bundle \\
+        --bundle-version=custom-feature
+
+    # Install from local repo with specific branch
+    hordectl install --install-dir=/tmp/test \\
+        --source=~/php/git/horde/bundle \\
+        --bundle-version=FRAMEWORK_6_0
 ';
     }
 
