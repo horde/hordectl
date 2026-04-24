@@ -42,14 +42,12 @@ if (isset($GLOBALS['_composer_autoload_path'])) {
 
 // Handle version command early (minimal dependencies)
 if (isset($argv[1]) && in_array($argv[1], ['version', '--version', '-v'], true)) {
-    $composerJson = __DIR__ . '/../composer.json';
     $version = 'unknown';
-
-    if (file_exists($composerJson)) {
-        $data = json_decode(file_get_contents($composerJson), true);
-        $version = $data['version'] ?? 'dev-main';
+    $hordeYml = __DIR__ . '/../.horde.yml';
+    if (file_exists($hordeYml)) {
+        $data = \Horde\Yaml\Yaml::loadFile($hordeYml);
+        $version = $data['version']['release'] ?? 'unknown';
     }
-
     echo "hordectl version {$version}\n";
     exit(0);
 }

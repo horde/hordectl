@@ -5,7 +5,8 @@
     "src"
   ],
   "files": [
-    "README.md"
+    "README.md",
+    ".horde.yml"
   ],
   "finder": [
     {
@@ -29,7 +30,7 @@
       "in": "vendor/horde/exception/locale"
     }
   ],
-  "git-version": "package_version",
+  "git-version": false,
   "intercept": true,
   "main": "bin/hordectl",
   "output": "build/hordectl.phar",

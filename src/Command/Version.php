@@ -52,15 +52,12 @@ class Version implements Module, ModuleUsage
      */
     protected function showVersion(): void
     {
-        // Try to read version from composer.json
-        $composerJson = dirname(__DIR__, 2) . '/composer.json';
         $version = 'unknown';
-
-        if (file_exists($composerJson)) {
-            $data = json_decode(file_get_contents($composerJson), true);
-            $version = $data['version'] ?? 'dev-main';
+        $hordeYml = dirname(__DIR__, 2) . '/.horde.yml';
+        if (file_exists($hordeYml)) {
+            $data = \Horde\Yaml\Yaml::loadFile($hordeYml);
+            $version = $data['version']['release'] ?? 'unknown';
         }
-
         $this->cli->writeln("hordectl version {$version}");
     }
 
