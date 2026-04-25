@@ -2,7 +2,7 @@
 
 namespace Horde\Hordectl\Compat;
 
-use Horde_String;
+use Horde\Util\HordeString;
 use Horde;
 use Horde\Exception\HordeException;
 use Horde_Cache;
@@ -84,7 +84,7 @@ class Horde_Core_Factory_Prefs extends Horde_Core_Factory_Base
         } else {
             try {
                 $driver = $conf['prefs']['driver'];
-                switch (Horde_String::lower($driver)) {
+                switch (HordeString::lower($driver)) {
                     case 'nosql':
                         $nosql = $this->_injector->getInstance('Horde_Core_Factory_Nosql')->create('horde', 'prefs');
                         if ($nosql instanceof Horde_Mongo_Client) {

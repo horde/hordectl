@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command\Configure;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Hordectl\Command\Configure\ConfigureHelperTrait;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
@@ -65,7 +65,7 @@ class Database implements Module, ModuleUsage
         return ['database', 'db'];
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): array
     {
         return [
             new Option(

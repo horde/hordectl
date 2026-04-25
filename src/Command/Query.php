@@ -2,8 +2,8 @@
 
 namespace Horde\Hordectl\Command;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait;
 use Horde\Hordectl\Output;
@@ -144,7 +144,7 @@ class Query implements Module, ModuleUsage
      *
      * @return string
      */
-    public function getUsage()
+    public function getUsage(): string
     {
         return 'query RESOURCE [IDENTIFIER]
 
@@ -178,7 +178,7 @@ Output is in YAML format, suitable for use with "hordectl import".
      *
      * @return string
      */
-    public function getSummary()
+    public function getSummary(): string
     {
         return 'Query and export Horde resources via API (requires API endpoint)';
     }

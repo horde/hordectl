@@ -9,8 +9,8 @@ namespace Horde\Hordectl;
 
 use Horde\Injector\Injector;
 use Horde\Argv\OptionGroup;
-use Horde_Cli_Modular_Module;
-use Horde_String;
+use Horde\Cli\Modular\Module;
+use Horde\Util\HordeString;
 use ReflectionClass;
 
 trait HordectlModuleTrait
@@ -26,12 +26,12 @@ trait HordectlModuleTrait
         return $this->getParentModule() === $this;
     }
 
-    public function getParentModule(): Horde_Cli_Modular_Module
+    public function getParentModule(): Module
     {
         return $this->_parentModule ?? $this;
     }
 
-    public function setParentModule(Horde_Cli_Modular_Module $module)
+    public function setParentModule(Module $module)
     {
         // TODO: prevent circular relation
         $this->_parentModule = $module;
@@ -42,27 +42,27 @@ trait HordectlModuleTrait
         return '';
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): iterable
     {
         return [];
     }
 
-    public function hasOptionGroup()
+    public function hasOptionGroup(): bool
     {
         return false;
     }
 
-    public function getOptionGroupDescription()
+    public function getOptionGroupDescription(): string
     {
         return '';
     }
 
-    public function getOptionGroupOptions($action = null)
+    public function getOptionGroupOptions($action = null): iterable
     {
         return [];
     }
 
-    public function getOptionGroupTitle()
+    public function getOptionGroupTitle(): string
     {
         return '';
     }
@@ -74,7 +74,7 @@ trait HordectlModuleTrait
      *
      * @return string The title of the module
      */
-    public function getTitle()
+    public function getTitle(): string
     {
         return (new ReflectionClass($this))->getShortName();
     }
@@ -89,7 +89,7 @@ trait HordectlModuleTrait
      */
     public function getPositionalArgs(): array
     {
-        return [Horde_String::lower((new ReflectionClass($this))->getShortName())];
+        return [HordeString::lower((new ReflectionClass($this))->getShortName())];
     }
 
     /**

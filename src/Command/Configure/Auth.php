@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command\Configure;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Hordectl\ConfigHelper;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
@@ -52,7 +52,7 @@ class Auth implements Module, ModuleUsage
         return ['authentication', 'auth'];
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): array
     {
         return [
             new Option(
@@ -238,12 +238,12 @@ class Auth implements Module, ModuleUsage
         $this->cli->writeln();
     }
 
-    public function getUsage()
+    public function getUsage(): string
     {
         return 'Configure authentication driver';
     }
 
-    public function getSummary()
+    public function getSummary(): string
     {
         return 'Configure authentication settings';
     }

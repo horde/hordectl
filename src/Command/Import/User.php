@@ -2,8 +2,8 @@
 
 namespace Horde\Hordectl\Command\Import;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Argv\Parser;
 use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;

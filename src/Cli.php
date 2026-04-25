@@ -14,8 +14,8 @@ use Horde\Exception\HordeException;
 use Horde\Injector\Injector;
 use Horde\Injector\TopLevel;
 use Horde_Cli_Modular as Cli_Modular;
-use Horde_Cli_Modular_Module as Module;
-use Horde_String;
+use Horde\Cli\Modular\Module;
+use Horde\Util\HordeString;
 
 /**
  * Hordectl CLI Root Module
@@ -112,7 +112,7 @@ class Cli implements Module
             // preliminary index of commands
             $cli->writeln("Found Modules:");
             foreach ($CliModule->listModules() as $module) {
-                $cli->writeln(Horde_String::lower($module->getTitle()));
+                $cli->writeln(HordeString::lower($module->getTitle()));
             }
             return 0;
         }

@@ -14,7 +14,7 @@
 
 namespace Horde\Hordectl\Compat;
 
-use Horde_String;
+use Horde\Util\HordeString;
 use Horde;
 use Horde\Exception\HordeException;
 use Horde_Core_Factory_Base;
@@ -65,7 +65,7 @@ class Horde_Core_Factory_Identity extends Horde_Core_Factory_Base
 
             default:
                 if (!is_null($driver)) {
-                    $class = Horde_String::ucfirst($driver) . '_Prefs_Identity';
+                    $class = HordeString::ucfirst($driver) . '_Prefs_Identity';
                     if (!class_exists($class)) {
                         throw new HordeException($driver . ' identity driver does not exist.');
                     }

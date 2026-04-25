@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait as HasModules;
 use Horde\Hordectl\Output;

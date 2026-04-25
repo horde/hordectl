@@ -17,8 +17,8 @@ use Horde\Hordectl\HordectlModuleTrait;
 use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
 use Horde\Cli\Cli as HordeCli;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 
 /**
  * Create command module

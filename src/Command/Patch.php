@@ -11,8 +11,8 @@ use Horde\Hordectl\Output;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\TargetCapabilityTrait;
 use Horde\Injector\Injector;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Exception;
 use Horde\Cli\Cli as HordeCli;
 use RuntimeException;
@@ -41,7 +41,7 @@ class Patch implements Module, ModuleUsage
         $this->_parser->allowInterspersedArgs = false;
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): array
     {
         return
             [
@@ -142,7 +142,7 @@ class Patch implements Module, ModuleUsage
      *
      * @return string
      */
-    public function getUsage()
+    public function getUsage(): string
     {
         return 'patch user <username> <password>
 
@@ -168,7 +168,7 @@ with clear error messages.
      *
      * @return string
      */
-    public function getSummary()
+    public function getSummary(): string
     {
         return 'Modify individual resources via Admin REST API (requires API endpoint)';
     }
