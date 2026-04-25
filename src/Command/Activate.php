@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Command;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\Output;
@@ -53,7 +53,7 @@ class Activate implements Module, ModuleUsage
         $this->_parser->allowInterspersedArgs = false;
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): array
     {
         return [
             new \Horde\Argv\Option(
@@ -179,7 +179,7 @@ class Activate implements Module, ModuleUsage
         }
     }
 
-    public function getUsage()
+    public function getUsage(): string
     {
         return 'activate [--force]
 
@@ -204,7 +204,7 @@ EXAMPLES
 ';
     }
 
-    public function getSummary()
+    public function getSummary(): string
     {
         return 'Activate Horde installation by copying default configuration (local only)';
     }

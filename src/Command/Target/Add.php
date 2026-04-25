@@ -15,7 +15,7 @@ use Horde\Hordectl\Target;
 use Horde\Hordectl\TargetResolver;
 use Horde\Hordectl\TargetType;
 use Horde\Injector\Injector;
-use Horde_Cli_Modular_Module as Module;
+use Horde\Cli\Modular\Module;
 
 /**
  * Target add command

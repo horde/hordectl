@@ -15,7 +15,7 @@ namespace Horde\Hordectl;
 use ArrayIterator;
 use Horde\Injector\Injector;
 use DirectoryIterator;
-use Horde_Cli_Modular_Exception;
+use Horde\Cli\Modular\ModularCliException;
 
 trait HasModulesTrait
 {
@@ -33,12 +33,12 @@ trait HasModulesTrait
     private function _initModules(Injector $dependencies, string $prefix, string $directory, array $exclude = [])
     {
         if (empty($directory)) {
-            throw new Horde_Cli_Modular_Exception(
+            throw new ModularCliException(
                 'The "directory" parameter is missing!'
             );
         }
         if (!file_exists($directory)) {
-            throw new Horde_Cli_Modular_Exception(
+            throw new ModularCliException(
                 sprintf(
                     'The indicated directory %s does not exist!',
                     $directory

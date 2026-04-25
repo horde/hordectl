@@ -8,8 +8,8 @@ use Horde\Hordectl\HasModulesTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\Output;
 use Horde\Injector\Injector;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Cli\Cli as HordeCli;
 
 /**
@@ -115,7 +115,7 @@ class Test implements Module, ModuleUsage
      *
      * @return string
      */
-    public function getUsage()
+    public function getUsage(): string
     {
         return 'test SUBSYSTEM
 
@@ -151,7 +151,7 @@ is working correctly. Tests use reflection to introspect wrapped drivers
      *
      * @return string
      */
-    public function getSummary()
+    public function getSummary(): string
     {
         return 'Test Horde subsystems (db, cache, session, logger, auth, jwt)';
     }

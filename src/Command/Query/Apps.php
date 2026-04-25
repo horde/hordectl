@@ -17,8 +17,8 @@ declare(strict_types=1);
 namespace Horde\Hordectl\Command\Query;
 
 use Exception;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;

@@ -2,8 +2,8 @@
 
 namespace Horde\Hordectl\Command;
 
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Horde\Hordectl\HordectlModuleTrait as ModuleTrait;
 use Horde\Hordectl\HasModulesTrait;
 use Horde\Hordectl\Output;
@@ -40,7 +40,7 @@ class Import implements Module, ModuleUsage
         );
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): array
     {
         return
             [

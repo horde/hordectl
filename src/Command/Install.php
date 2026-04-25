@@ -27,8 +27,8 @@ use Horde\Http\RequestFactory;
 use Horde\Http\ResponseFactory;
 use Horde\Http\StreamFactory;
 use Horde\Injector\Injector;
-use Horde_Cli_Modular_Module as Module;
-use Horde_Cli_Modular_ModuleUsage as ModuleUsage;
+use Horde\Cli\Modular\Module;
+use Horde\Cli\Modular\ModuleUsage;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use RuntimeException;
@@ -71,7 +71,7 @@ class Install implements Module, ModuleUsage
         $this->requestFactory = new RequestFactory();
     }
 
-    public function getBaseOptions()
+    public function getBaseOptions(): array
     {
         return [
             new Option(
@@ -798,7 +798,7 @@ class Install implements Module, ModuleUsage
         return null;
     }
 
-    public function getUsage()
+    public function getUsage(): string
     {
         return 'install --install-dir=<directory> [options]
 
@@ -865,7 +865,7 @@ EXAMPLES
 ';
     }
 
-    public function getSummary()
+    public function getSummary(): string
     {
         return 'Install Horde by downloading latest horde/bundle';
     }
