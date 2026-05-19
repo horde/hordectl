@@ -179,3 +179,15 @@
   notes: |-
     Original version string was 1.0.0alpha1
     Initialize Module
+1.0.0-RC1:
+  api: 1.0.0-RC1
+  state:
+    release: RC
+    api: RC
+  date: 2026-05-19
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: |-
+    refactor: Use the PSR-4 versions of horde/cli and horde/cli_modular throughout
+    fix: read version string from .horde.yml
