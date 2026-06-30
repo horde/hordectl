@@ -59,3 +59,8 @@ vendor/
 # Added by horde-components QC --fix-qc-issues
 # Local PHP configuration files
 **/*.local.php
+
+# Horde installer plugin runtime data
+/var/
+# Horde installer plugin web-accessible directory
+/web/
