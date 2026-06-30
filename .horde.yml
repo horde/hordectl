@@ -20,7 +20,7 @@ state:
   release: RC
   api: alpha
 license:
-  identifier: LGPL-2.1
+  identifier: LGPL-2.1-only
   uri: http://www.horde.org/licenses/lgpl21
 dependencies:
   required:
