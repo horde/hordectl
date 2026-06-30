@@ -30,7 +30,7 @@
       "in": "vendor/horde/exception/locale"
     }
   ],
-  "git-version": false,
+  "git-version": null,
   "intercept": true,
   "main": "bin/hordectl",
   "output": "build/hordectl.phar",
