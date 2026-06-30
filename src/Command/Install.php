@@ -491,8 +491,19 @@ class Install implements Module, ModuleUsage
         // Move contents from extracted directory to destination
         $extractedDir = $tmpExtract . '/' . $archiveDirName;
         if (!is_dir($extractedDir)) {
-            @rmdir($tmpExtract);
-            return false;
+            // Fallback: the predicted directory name did not match what
+            // the archive actually contained. This can happen when the
+            // archive comes from a non-GitHub source whose naming rules
+            // differ, or when GitHub changes its naming convention in a
+            // way the predictor does not yet model. Look for any single
+            // top-level directory and use it. If the layout is not the
+            // expected single-root shape, give up rather than guess.
+            $discovered = $this->findSingleTopLevelDirectory($tmpExtract);
+            if ($discovered === null) {
+                @rmdir($tmpExtract);
+                return false;
+            }
+            $extractedDir = $discovered;
         }
 
         // Move all files from extracted directory to destination
@@ -513,6 +524,53 @@ class Install implements Module, ModuleUsage
         @rmdir($tmpExtract);
 
         return true;
+    }
+
+    /**
+     * Locate a single top-level directory inside an extracted archive.
+     *
+     * Used by {@see extractArchive()} as a fallback when the predicted
+     * archive-directory name does not exist. Returns the absolute path
+     * to the discovered directory, or `null` if the archive does not
+     * have the conventional single-root-directory shape (e.g. files at
+     * the top level, multiple top-level directories, or an empty
+     * archive).
+     *
+     * Pure function (filesystem-driven): does not modify the directory
+     * it inspects.
+     *
+     * @param string $tmpExtract Path to the directory the archive was
+     *                           extracted into.
+     * @return string|null Absolute path to the single top-level
+     *                    directory, or null when the shape is not
+     *                    single-root.
+     */
+    private function findSingleTopLevelDirectory(string $tmpExtract): ?string
+    {
+        $entries = scandir($tmpExtract);
+        if ($entries === false) {
+            return null;
+        }
+
+        $topLevelDirs = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $path = $tmpExtract . '/' . $entry;
+            if (!is_dir($path)) {
+                // A file at the top level is incompatible with the
+                // single-root shape we expect from a GitHub archive.
+                return null;
+            }
+            $topLevelDirs[] = $path;
+        }
+
+        if (count($topLevelDirs) !== 1) {
+            return null;
+        }
+
+        return $topLevelDirs[0];
     }
 
     /**
@@ -644,7 +702,18 @@ class Install implements Module, ModuleUsage
      * Get directory name from extracted archive
      *
      * GitHub archives extract to: {repo}-{ref}/
-     * The ref is sanitized (e.g., "feat/name" becomes "feat-name")
+     *
+     * Two rules to mirror:
+     *
+     *  1. The ref is sanitized — slashes become dashes (so `feat/foo`
+     *     in the URL produces `bundle-feat-foo/` on disk).
+     *
+     *  2. A leading 'v' is stripped from semver-like tags. GitHub keeps
+     *     the 'v' in the download URL but drops it in the directory
+     *     name inside the archive: `v1.1.1RC1.zip` extracts to
+     *     `bundle-1.1.1RC1/`. The heuristic matches `^v\d` so that
+     *     tags like `vendor-branch` (which happen to start with 'v'
+     *     but are not semver tags) are NOT stripped. See issue #13.
      *
      * @param string $repo Repository name
      * @param string $version Version/ref downloaded
@@ -652,8 +721,12 @@ class Install implements Module, ModuleUsage
      */
     private function getArchiveDirectoryName(string $repo, string $version): string
     {
-        // GitHub sanitizes ref names: replaces / with -
         $sanitizedRef = str_replace('/', '-', $version);
+
+        if (preg_match('/^v\d/', $sanitizedRef) === 1) {
+            $sanitizedRef = substr($sanitizedRef, 1);
+        }
+
         return "{$repo}-{$sanitizedRef}";
     }
 
