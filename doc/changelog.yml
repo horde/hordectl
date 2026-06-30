@@ -1,184 +1,14 @@
 ---
-1.0.0-beta2:
-  api: 1.0.0-beta2
+1.0.0:
+  api: 1.0.0
   state:
-    release: beta
-    api: beta
-  date: 2026-03-28
+    release: stable
+    api: stable
+  date: 2026-06-30
   license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    feat: issue #9 Allow selection of bundle version and source when installing
-1.0.0-beta1:
-  api: 1.0.0-beta1
-  state:
-    release: beta
-    api: beta
-  date: 2026-03-27
-  license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    feat: UX improvement for hordectl install process
-1.0.0-alpha11:
-  api: 1.0.0-alpha11
-  state:
-    release: alpha
-    api: alpha
-  date: 2026-03-26
-  license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    style: php-cs-fixer
-    feat: usability improvements for the configure database command
-    feat: Use modern presentation layer for CLI
-    fix: don't commit hordectl.phar
-1.0.0-alpha10:
-  api: 1.0.0-alpha10
-  state:
-    release: alpha
-    api: alpha
-  date: 2026-03-16
-  license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    feat(api): Convert hordectl from hook-in approach to REST API approacj
-1.0.0-alpha9:
-  api: 1.0.0-alpha9
-  state:
-    release: alpha
-    api: alpha
-  date: 2026-03-13
-  license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    fix(cli): handle version command before Horde bootstrap
-1.0.0-alpha8:
-  api: 1.0.0-alpha8
-  state:
-    release: alpha
-    api: alpha
-  date: 2026-03-13
-  license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    feat(cli): add version command for PHAR validation
-1.0.0-alpha7:
-  api: 1.0.0-alpha7
-  state:
-    release: alpha
-    api: alpha
-  date: 2026-03-13
-  license:
-    identifier: LGPL-2.1
-    uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    feat: implement better help/feedback and a new test command
-    Update horde/phpconfigfile version constraint
-    fix(deps): allow PhpConfigFile ^0 for development compatibility
-    fix: Wrong version required of phpconfigfile
-    fix(configure): add getPositionalArgs() to support command aliases
-    fix(activate): add command name check to prevent auto-execution
-1.0.0-alpha6:
-  api: 1.0.0-alpha1
-  state:
-    release: alpha
-    api: alpha
-  date: 2026-03-01
-  license:
-    identifier: LGPL-2.1
-    uri: http://www.horde.org/licenses/lgpl21
-  notes: |
-    refactor(configure): extract common helpers into ConfigureHelperTrait
-    feat(configure): implement Groups, Permissions, and Tokens subcommands
-    feat(configure): implement LDAP subcommand with ConfigHelper
-    feat(configure): implement SessionHandler subcommand with ConfigHelper
-    docs(examples): add database configuration demo script
-    feat(configure): implement Database subcommand with ConfigHelper
-    feat(config): add ConfigHelper class for config file manipulation
-    chore(deps): add horde/phpconfigfile dependency
-    feat(configure): add stubs for critical subsystem configuration
-    feat(configure): add configure command with database stub
-    feat(cli): show helpful usage instead of "No Module ran" error
-    fix(psr4): use PSR-4 class names for Argv\Parser instead of PEAR names
-    feat(hordectl): add activate command to copy preset config and reconfigure
-    feat(hordectl): add reconfigure command to minimal CLI
-    feat(cli): add minimal CLI fallback for incomplete Horde installations
-    refactor: migrate from PSR-0 Horde_Argv to PSR-4 Horde\Argv
-    refactor: migrate from PSR-0 Horde_Exception to PSR-4 Horde\Exception\HordeException
-    refactor: migrate from PSR-0 Horde_Injector to PSR-4 Horde\Injector\Injector
-    test: achieve 100% passing test suite with full PHPUnit 12 compatibility
-    refactor(yaml): migrate from PSR-0 to PSR-4 Horde\Yaml classes
-    feat: Give instructions on cli if not yet installed properly
-1.0.0-alpha5:
-  api: 1.0.0-alpha1
-  state:
-    release: true
-    api: true
-  date: 2025-05-07
-  license:
-    identifier: LGPL-2.1
-    uri: http://www.horde.org/licenses/lgpl21
-  notes: |
-    feat: Present a more human friendly output when horde was not found
-    feat: Find horde installations by HORDE_GIT_DIR or HORDE_BASE environment variables
-    docs: Update readme
-1.0.0-alpha4:
-  api: 1.0.0alpha1
-  state:
-    release: alpha
-    api: alpha
-  date: 2022-11-04
-  license:
-    identifier: LGP-2.1
-    uri: http://www.horde.org/licenses/lgpl21
-  notes: |
-    Original version string was 1.0.0alpha4
-    [rla] Enable PHP 8.x compat.
-    |+
-1.0.0-alpha3:
-  api: 1.0.0alpha1
-  state:
-    release: alpha
-    api: alpha
-  date: 2021-03-13
-  license:
-    identifier: LGP-2.1
-    uri: http://www.horde.org/licenses/lgpl21
-  notes: |-
-    Original version string was 1.0.0alpha3
-    |+
-1.0.0-alpha2:
-  api: 1.0.0alpha1
-  state:
-    release: alpha
-    api: alpha
-  date: 2021-03-03
-  license:
-    identifier: LGP-2.1
-    uri: http://www.horde.org/licenses/lgpl21
-  notes: |
-    Original version string was 1.0.0alpha2
-    [rla] Use horde's native bootstrapping.
-    [rla] Make help command more useful.
-    |+
-1.0.0-alpha1:
-  api: 1.0.0alpha1
-  state:
-    release: alpha
-    api: alpha
-  date: 2021-02-24
-  license:
-    identifier: LGP-2.1
-    uri: http://www.horde.org/licenses/lgpl21
-  notes: |-
-    Original version string was 1.0.0alpha1
-    Initialize Module
+    identifier: LGPL-2.1-only
+    uri: https://spdx.org/licenses/LGPL-2.1-only.html
+  notes: "chore(ci): regenerate ci-platform and flag installer-plugin requirement\nchore(license): modernize SPDX identifier to LGPL-2.1-only\nchore(gitignore): ignore var/ and web/ produced by horde-installer-plugin\nchore(composer): allow horde/horde-installer-plugin\nfix(install): strip leading v from semver tags and fall back to single-root discovery\nchore: Update workflow dependency"
 1.0.0-RC1:
   api: 1.0.0-RC1
   state:
@@ -188,6 +18,134 @@
   license:
     identifier: LGPL-2.1
     uri: https://spdx.org/licenses/LGPL-2.1.html
-  notes: |-
-    refactor: Use the PSR-4 versions of horde/cli and horde/cli_modular throughout
-    fix: read version string from .horde.yml
+  notes: "refactor: Use the PSR-4 versions of horde/cli and horde/cli_modular throughout\nfix: read version string from .horde.yml"
+1.0.0-beta2:
+  api: 1.0.0-beta2
+  state:
+    release: beta
+    api: beta
+  date: 2026-03-28
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: 'feat: issue #9 Allow selection of bundle version and source when installing'
+1.0.0-beta1:
+  api: 1.0.0-beta1
+  state:
+    release: beta
+    api: beta
+  date: 2026-03-27
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: 'feat: UX improvement for hordectl install process'
+1.0.0-alpha11:
+  api: 1.0.0-alpha11
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-26
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: "style: php-cs-fixer\nfeat: usability improvements for the configure database command\nfeat: Use modern presentation layer for CLI\nfix: don't commit hordectl.phar"
+1.0.0-alpha10:
+  api: 1.0.0-alpha10
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-16
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: 'feat(api): Convert hordectl from hook-in approach to REST API approacj'
+1.0.0-alpha9:
+  api: 1.0.0-alpha9
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-13
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: 'fix(cli): handle version command before Horde bootstrap'
+1.0.0-alpha8:
+  api: 1.0.0-alpha8
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-13
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: 'feat(cli): add version command for PHAR validation'
+1.0.0-alpha7:
+  api: 1.0.0-alpha7
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-13
+  license:
+    identifier: LGPL-2.1
+    uri: https://spdx.org/licenses/LGPL-2.1.html
+  notes: "feat: implement better help/feedback and a new test command\nUpdate horde/phpconfigfile version constraint\nfix(deps): allow PhpConfigFile ^0 for development compatibility\nfix: Wrong version required of phpconfigfile\nfix(configure): add getPositionalArgs() to support command aliases\nfix(activate): add command name check to prevent auto-execution"
+1.0.0-alpha6:
+  api: 1.0.0-alpha1
+  state:
+    release: alpha
+    api: alpha
+  date: 2026-03-01
+  license:
+    identifier: LGPL-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: "refactor(configure): extract common helpers into ConfigureHelperTrait\nfeat(configure): implement Groups, Permissions, and Tokens subcommands\nfeat(configure): implement LDAP subcommand with ConfigHelper\nfeat(configure): implement SessionHandler subcommand with ConfigHelper\ndocs(examples): add database configuration demo script\nfeat(configure): implement Database subcommand with ConfigHelper\nfeat(config): add ConfigHelper class for config file manipulation\nchore(deps): add horde/phpconfigfile dependency\nfeat(configure): add stubs for critical subsystem configuration\nfeat(configure): add configure command with database stub\nfeat(cli): show helpful usage instead of \"No Module ran\" error\nfix(psr4): use PSR-4 class names for Argv\\Parser instead of PEAR names\nfeat(hordectl): add activate command to copy preset config and reconfigure\nfeat(hordectl): add reconfigure command to minimal CLI\nfeat(cli): add minimal CLI fallback for incomplete Horde installations\nrefactor: migrate from PSR-0 Horde_Argv to PSR-4 Horde\\Argv\nrefactor: migrate from PSR-0 Horde_Exception to PSR-4 Horde\\Exception\\HordeException\nrefactor: migrate from PSR-0 Horde_Injector to PSR-4 Horde\\Injector\\Injector\ntest: achieve 100% passing test suite with full PHPUnit 12 compatibility\nrefactor(yaml): migrate from PSR-0 to PSR-4 Horde\\Yaml classes\nfeat: Give instructions on cli if not yet installed properly\n"
+1.0.0-alpha5:
+  api: 1.0.0-alpha1
+  state:
+    release: true
+    api: true
+  date: 2025-05-07
+  license:
+    identifier: LGPL-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: "feat: Present a more human friendly output when horde was not found\nfeat: Find horde installations by HORDE_GIT_DIR or HORDE_BASE environment variables\ndocs: Update readme\n"
+1.0.0-alpha4:
+  api: 1.0.0alpha1
+  state:
+    release: alpha
+    api: alpha
+  date: 2022-11-04
+  license:
+    identifier: LGP-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: "Original version string was 1.0.0alpha4\n[rla] Enable PHP 8.x compat.\n|+\n"
+1.0.0-alpha3:
+  api: 1.0.0alpha1
+  state:
+    release: alpha
+    api: alpha
+  date: 2021-03-13
+  license:
+    identifier: LGP-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: "Original version string was 1.0.0alpha3\n|+"
+1.0.0-alpha2:
+  api: 1.0.0alpha1
+  state:
+    release: alpha
+    api: alpha
+  date: 2021-03-03
+  license:
+    identifier: LGP-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: "Original version string was 1.0.0alpha2\n[rla] Use horde's native bootstrapping.\n[rla] Make help command more useful.\n|+\n"
+1.0.0-alpha1:
+  api: 1.0.0alpha1
+  state:
+    release: alpha
+    api: alpha
+  date: 2021-02-24
+  license:
+    identifier: LGP-2.1
+    uri: http://www.horde.org/licenses/lgpl21
+  notes: "Original version string was 1.0.0alpha1\nInitialize Module"
