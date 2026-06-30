@@ -514,7 +514,7 @@ class Install implements Module, ModuleUsage
             }
             $source = $extractedDir . '/' . $file;
             $dest = $destinationDir . '/' . $file;
-            if (!rename($source, $dest)) {
+            if (!$this->xlink_rename($source, $dest)) {
                 return false;
             }
         }
@@ -525,6 +525,67 @@ class Install implements Module, ModuleUsage
 
         return true;
     }
+    /**
+     * replacement for rename because of cross link errors
+     *
+     * @param string $source source directory or filename
+     *
+     * @param string $target target directory or filename
+     */ 
+    private function xlink_rename(string $source, string $target): bool {
+    // 1. Try standard rename first (fastest if on the same layer)
+    if (@rename($source, $target)) {
+        return true;
+    }
+
+    // 2. Handle Directory Transfers Recursively
+    if (is_dir($source)) {
+        if (!is_dir($target)) {
+            mkdir($target, 0755, true);
+        }
+        
+        $dir = opendir($source);
+        if (!$dir) {
+            return false;
+        }
+
+        while (($file = readdir($dir)) !== false) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+            
+            $srcFile = $source . '/' . $file;
+            $tgtFile = $target . '/' . $file;
+            
+            // Recursively process nested directories and files
+            if (is_dir($srcFile)) {
+                if (!$this->xlink_rename($srcFile, $tgtFile)) {
+                    closedir($dir);
+                    return false;
+                }
+            } else {
+                if (!copy($srcFile, $tgtFile) || !unlink($srcFile)) {
+                    closedir($dir);
+                    return false;
+                }
+            }
+        }
+        closedir($dir);
+        
+        // At this point, all files and subfolders are guaranteed to be gone
+        return rmdir($source);
+    } 
+    
+    // 3. Handle Single File Transfers
+    if (is_file($source)) {
+        if (copy($source, $target)) {
+            return unlink($source);
+        }
+    }
+    
+    return false;
+}
+
 
     /**
      * Locate a single top-level directory inside an extracted archive.
@@ -751,7 +812,7 @@ class Install implements Module, ModuleUsage
             // Create temporary tar file
             $tmpFile = tempnam(sys_get_temp_dir(), 'horde_local_');
             $tarFile = $tmpFile . '.tar';
-            rename($tmpFile, $tarFile);
+            $this->xlink_rename($tmpFile, $tarFile);
 
             // Use git archive to export specific ref
             $cmd = sprintf(
