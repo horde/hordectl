@@ -64,3 +64,6 @@ vendor/
 /var/
 # Horde installer plugin web-accessible directory
 /web/
+
+# Legacy secret file
+.hordectl-secret
