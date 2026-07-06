@@ -4,224 +4,102 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Test\Command;
 
+use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\Command\Help;
 use Horde\Hordectl\Dependencies;
-use Horde_Cli;
-use Horde\Argv\Parser;
-use PHPUnit\Framework\TestCase;
+use Horde\Hordectl\Output;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
-use stdClass;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Test the Help command
+ *
+ * Help is a leaf-level module: its handle() checks argv[0] == 'help' and, if
+ * so, prints its usage. It does not consult a Horde registry or discover apps
+ * from the target install — that surface belongs to `hordectl query apps`
+ * which speaks to the target via AdminApiClient. See
+ * src/Command/Query/Apps.php.
  */
 #[CoversClass(Help::class)]
-#[AllowMockObjectsWithoutExpectations]
 class HelpTest extends TestCase
 {
-    private $mockInjector;
-    private $mockCli;
-    private $mockParser;
-
-    protected function setUp(): void
+    /**
+     * Build the injector stub that Help's constructor consumes.
+     *
+     * Help asks for Horde\Cli\Cli, Horde\Argv\Parser, and calls
+     * createOutput($cli). The stubs are just wired to return the given
+     * doubles; no interaction is verified on the injector itself here.
+     * Tests that want to verify injector behavior create their own
+     * mock and pass through this same wiring shape.
+     */
+    private function injectorFor(HordeCli $cli, Parser $parser): Dependencies
     {
-        $this->mockInjector = $this->createMock(Dependencies::class);
-        $this->mockCli = $this->createMock(Horde_Cli::class);
-        $this->mockParser = $this->createMock(Parser::class);
-
-        // Setup default mock behavior for basic constructor needs
-        // Note: Tests can override this by calling method() again
-        $this->mockInjector->method('getInstance')
-            ->willReturnCallback(function ($class) {
-                if ($class === '\Horde_Cli') {
-                    return $this->mockCli;
+        $injector = $this->createStub(Dependencies::class);
+        $injector->method('getInstance')
+            ->willReturnCallback(function ($class) use ($cli, $parser) {
+                if ($class === HordeCli::class) {
+                    return $cli;
                 }
-                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
-                    return $this->mockParser;
+                if ($class === Parser::class) {
+                    return $parser;
                 }
-                // For HordeRegistry and other classes, return null by default
-                // Individual tests should set up their specific needs
                 return null;
             });
+        $injector->method('createOutput')
+            ->willReturn(new Output($cli));
+
+        return $injector;
     }
 
     public function testConstructorCreatesHelpInstance(): void
     {
-        $help = new Help($this->mockInjector);
+        $help = new Help($this->injectorFor(
+            $this->createStub(HordeCli::class),
+            $this->createStub(Parser::class),
+        ));
+
         $this->assertInstanceOf(Help::class, $help);
-    }
-
-    public function testConstructorGetsCliFromInjector(): void
-    {
-        $this->mockInjector->expects($this->atLeastOnce())
-            ->method('getInstance')
-            ->with($this->logicalOr(
-                $this->equalTo('\Horde_Cli'),
-                $this->equalTo(Parser::class)
-            ));
-
-        new Help($this->mockInjector);
-    }
-
-    public function testConstructorGetsParserFromInjector(): void
-    {
-        $this->mockInjector->expects($this->atLeastOnce())
-            ->method('getInstance')
-            ->with($this->logicalOr(
-                $this->equalTo(Parser::class),
-                $this->equalTo('\Horde_Cli')
-            ));
-
-        new Help($this->mockInjector);
     }
 
     public function testHandleReturnsFalseOnEmptyArgv(): void
     {
-        $help = new Help($this->mockInjector);
-        $result = $help->handle([]);
-        $this->assertFalse($result);
+        $help = new Help($this->injectorFor(
+            $this->createStub(HordeCli::class),
+            $this->createStub(Parser::class),
+        ));
+
+        $this->assertFalse($help->handle([]));
     }
 
     public function testHandleReturnsFalseWhenNotHelpCommand(): void
     {
-        $help = new Help($this->mockInjector);
-        $result = $help->handle(['other']);
-        $this->assertFalse($result);
+        $help = new Help($this->injectorFor(
+            $this->createStub(HordeCli::class),
+            $this->createStub(Parser::class),
+        ));
+
+        $this->assertFalse($help->handle(['other']));
     }
 
     public function testHandleWritesHelpWhenHelpCommand(): void
     {
-        // Setup mock to return required dependencies for help command
-        $this->mockInjector->method('getInstance')
-            ->willReturnCallback(function ($class) {
-                if ($class === '\Horde_Cli') {
-                    return $this->mockCli;
-                }
-                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
-                    return $this->mockParser;
-                }
-                if ($class === 'HordeRegistry') {
-                    $mockRegistry = new stdClass();
-                    $mockRegistry->applications = [];
-                    return $mockRegistry;
-                }
-                return null;
-            });
+        $cli = $this->createMock(HordeCli::class);
 
-        $this->mockInjector->method('findHordePath')
-            ->willReturn('/tmp/horde');
-
-        $this->mockInjector->method('getRegistryApplications')
-            ->willReturn([]);
-
-        $help = new Help($this->mockInjector);
-
-        // Expect at least the "Help" message to be written
-        $helpDisplayed = false;
-        $this->mockCli->expects($this->atLeastOnce())
+        // The module identifies itself by writing at least one line that
+        // contains the word "help" (case-insensitive).
+        $sawHelp = false;
+        $cli->expects($this->atLeastOnce())
             ->method('writeln')
-            ->willReturnCallback(function ($message) use (&$helpDisplayed) {
-                if (stripos($message, 'help') !== false) {
-                    $helpDisplayed = true;
+            ->willReturnCallback(function ($message = '') use (&$sawHelp) {
+                if (is_string($message) && stripos($message, 'help') !== false) {
+                    $sawHelp = true;
                 }
             });
 
-        $result = $help->handle(['help']);
-        $this->assertTrue($result);
-        $this->assertTrue($helpDisplayed, "Expected 'help' message to be displayed");
-    }
+        $help = new Help($this->injectorFor($cli, $this->createStub(Parser::class)));
 
-    public function testHelpCommandDisplaysHordePath(): void
-    {
-        $testPath = '/test/horde/path';
-
-        $this->mockInjector->method('getInstance')
-            ->willReturnCallback(function ($class) {
-                if ($class === '\Horde_Cli') {
-                    return $this->mockCli;
-                }
-                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
-                    return $this->mockParser;
-                }
-                if ($class === 'HordeRegistry') {
-                    $mockRegistry = new stdClass();
-                    $mockRegistry->applications = [];
-                    return $mockRegistry;
-                }
-                return null;
-            });
-
-        $this->mockInjector->method('findHordePath')
-            ->willReturn($testPath);
-
-        $this->mockInjector->method('getRegistryApplications')
-            ->willReturn([]);
-
-        $help = new Help($this->mockInjector);
-
-        // Expect the path to be displayed in at least one writeln call
-        $pathDisplayed = false;
-        $this->mockCli->expects($this->atLeastOnce())
-            ->method('writeln')
-            ->willReturnCallback(function ($message) use ($testPath, &$pathDisplayed) {
-                if (str_contains($message, $testPath)) {
-                    $pathDisplayed = true;
-                }
-            });
-
-        $help->handle(['help']);
-        $this->assertTrue($pathDisplayed, "Expected path '$testPath' to be displayed");
-    }
-
-    public function testHelpCommandListsApplications(): void
-    {
-        // Create a fresh mock for this test with custom registry
-        $mockInjector = $this->createMock(Dependencies::class);
-        $mockCli = $this->createMock(Horde_Cli::class);
-        $mockParser = $this->createMock(Parser::class);
-
-        $mockRegistry = new stdClass();
-        $mockRegistry->applications = [
-            'testapp' => ['status' => 'active'],
-        ];
-
-        $mockInjector->method('getInstance')
-            ->willReturnCallback(function ($class) use ($mockCli, $mockParser, $mockRegistry) {
-                if ($class === '\Horde_Cli') {
-                    return $mockCli;
-                }
-                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
-                    return $mockParser;
-                }
-                if ($class === 'HordeRegistry') {
-                    return $mockRegistry;
-                }
-                return null;
-            });
-
-        $mockInjector->method('findHordePath')
-            ->willReturn('/tmp/horde');
-
-        $mockInjector->method('getRegistryApplications')
-            ->willReturn(['testapp']);
-
-        $mockInjector->method('getApplicationResources')
-            ->willReturn(null);
-
-        $help = new Help($mockInjector);
-
-        // Expect application to be listed
-        $appDisplayed = false;
-        $mockCli->expects($this->atLeastOnce())
-            ->method('writeln')
-            ->willReturnCallback(function ($message) use (&$appDisplayed) {
-                if (str_contains($message, 'testapp')) {
-                    $appDisplayed = true;
-                }
-            });
-
-        $help->handle(['help']);
-        $this->assertTrue($appDisplayed, "Expected 'testapp' to be displayed");
+        $this->assertTrue($help->handle(['help']));
+        $this->assertTrue($sawHelp, "Expected 'help' text in output");
     }
 }

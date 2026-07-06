@@ -7,7 +7,6 @@
 namespace Horde\Hordectl;
 
 use Horde\Cli\Cli as HordeCli;
-use Horde\Hordectl\Configuration\AppConfigReader;
 use Horde\Hordectl\Service\AdminApiClient;
 use Horde\Hordectl\Service\AdminApiConfig;
 use Horde\Http\Client\Curl;
@@ -68,75 +67,5 @@ class Dependencies extends Injector
             verbose: !empty($options['verbose']),
             quiet: !empty($options['quiet'])
         );
-    }
-
-    /**
-     * Expose Horde Config in global namespace (DEPRECATED)
-     *
-     * Legacy method - not used in target-based approach.
-     *
-     * @deprecated No longer needed without Horde bootstrap
-     * @return Dependencies
-     */
-    public function globalizeHordeConfig()
-    {
-        // Deprecated - no Horde config to globalize
-        return $this;
-    }
-
-    /**
-     * Push/initialize all globals which may be used by application code (DEPRECATED)
-     *
-     * Legacy method - not used in target-based approach.
-     *
-     * @deprecated No longer needed without Horde bootstrap
-     */
-    public function globalizeApp()
-    {
-        // Deprecated - no globals to push
-    }
-
-    /**
-     * Hide Horde Config from global namespace (DEPRECATED)
-     *
-     * Legacy method - not used in target-based approach.
-     *
-     * @deprecated No longer needed without Horde bootstrap
-     * @return Dependencies
-     */
-    public function unglobalizeHordeConfig()
-    {
-        // Deprecated - no globals to unset
-        return $this;
-    }
-
-    /**
-     * Return a list of applications from the Horde Registry (DEPRECATED)
-     *
-     * Legacy method - not available without Horde bootstrap.
-     * Use AdminApiClient for resource queries.
-     *
-     * @deprecated Use AdminApiClient instead
-     * @return string[]
-     */
-    public function getRegistryApplications(): array
-    {
-        // No Horde Registry available - return empty list
-        return [];
-    }
-
-    /**
-     * Return the application resource provider (DEPRECATED)
-     *
-     * Legacy method - not available without Horde bootstrap.
-     * Use AdminApiClient for resource queries.
-     *
-     * @deprecated Use AdminApiClient instead
-     * @return object|null
-     */
-    public function getApplicationResources(string $app): ?object
-    {
-        // No Horde Registry or app resources available - return null
-        return null;
     }
 }
