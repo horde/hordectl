@@ -29,6 +29,7 @@ use Horde\Http\StreamFactory;
 use Horde\Injector\Injector;
 use Horde\Cli\Modular\Module;
 use Horde\Cli\Modular\ModuleUsage;
+use Horde\Composer\RecursiveCopy;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use RuntimeException;
@@ -506,18 +507,8 @@ class Install implements Module, ModuleUsage
             $extractedDir = $discovered;
         }
 
-        // Move all files from extracted directory to destination
-        $files = scandir($extractedDir);
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            $source = $extractedDir . '/' . $file;
-            $dest = $destinationDir . '/' . $file;
-            if (!$this->xlink_rename($source, $dest)) {
-                return false;
-            }
-        }
+        $copy = new RecursiveCopy($extractedDir, $destinationDir);
+        $copy->copy();
 
         // Cleanup
         @rmdir($extractedDir);
@@ -525,66 +516,6 @@ class Install implements Module, ModuleUsage
 
         return true;
     }
-    /**
-     * replacement for rename because of cross link errors
-     *
-     * @param string $source source directory or filename
-     *
-     * @param string $target target directory or filename
-     */ 
-    private function xlink_rename(string $source, string $target): bool {
-    // 1. Try standard rename first (fastest if on the same layer)
-    if (@rename($source, $target)) {
-        return true;
-    }
-
-    // 2. Handle Directory Transfers Recursively
-    if (is_dir($source)) {
-        if (!is_dir($target)) {
-            mkdir($target, 0755, true);
-        }
-        
-        $dir = opendir($source);
-        if (!$dir) {
-            return false;
-        }
-
-        while (($file = readdir($dir)) !== false) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            
-            $srcFile = $source . '/' . $file;
-            $tgtFile = $target . '/' . $file;
-            
-            // Recursively process nested directories and files
-            if (is_dir($srcFile)) {
-                if (!$this->xlink_rename($srcFile, $tgtFile)) {
-                    closedir($dir);
-                    return false;
-                }
-            } else {
-                if (!copy($srcFile, $tgtFile) || !unlink($srcFile)) {
-                    closedir($dir);
-                    return false;
-                }
-            }
-        }
-        closedir($dir);
-        
-        // At this point, all files and subfolders are guaranteed to be gone
-        return rmdir($source);
-    } 
-    
-    // 3. Handle Single File Transfers
-    if (is_file($source)) {
-        if (copy($source, $target)) {
-            return unlink($source);
-        }
-    }
-    
-    return false;
-}
 
 
     /**
