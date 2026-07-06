@@ -25,6 +25,7 @@ use Horde\Hordectl\Service\AdminApi\Identity;
 use Horde\Hordectl\Service\AdminApi\IdentityList;
 use Horde\Hordectl\Service\AdminApi\Permission;
 use Horde\Hordectl\Service\AdminApi\PermissionList;
+use Horde\Hordectl\Service\AdminApi\Registry;
 use Horde\Hordectl\Service\AdminApi\User;
 use Horde\Hordectl\Service\AdminApi\UserList;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\AddGroupMemberRequestFactory;
@@ -47,6 +48,7 @@ use Horde\Hordectl\Service\AdminApi\RequestFactory\ListIdentitiesRequestFactory;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\PatchUserPasswordRequestFactory;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\PermissionRequestFactory;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\PermissionsRequestFactory;
+use Horde\Hordectl\Service\AdminApi\RequestFactory\RegistryRequestFactory;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\RemoveGroupMemberRequestFactory;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\SetDefaultIdentityRequestFactory;
 use Horde\Hordectl\Service\AdminApi\RequestFactory\SetGroupMembersRequestFactory;
@@ -147,6 +149,38 @@ class AdminApiClient
         }
 
         return ApplicationList::fromApiResponse($data['data']);
+    }
+
+    /**
+     * Get compiled registry.
+     *
+     * Calls GET /api/v1/admin/registry to retrieve the two-level
+     * compiled registry (default merge plus per-vhost deltas).
+     *
+     * @return Registry
+     * @throws RuntimeException on API error
+     */
+    public function getRegistry(): Registry
+    {
+        $factory = new RegistryRequestFactory(
+            $this->config,
+            $this->requestFactory
+        );
+
+        $request = $factory->create();
+        $response = $this->httpClient->sendRequest($request);
+
+        $this->validateResponse($response, 200);
+
+        $data = json_decode((string) $response->getBody(), true);
+
+        if (!isset($data['success']) || $data['success'] !== true) {
+            throw new RuntimeException(
+                $this->parseErrorResponse($response)
+            );
+        }
+
+        return Registry::fromApiResponse($data['data']);
     }
 
     /**
