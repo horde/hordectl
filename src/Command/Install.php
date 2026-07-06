@@ -29,7 +29,6 @@ use Horde\Http\StreamFactory;
 use Horde\Injector\Injector;
 use Horde\Cli\Modular\Module;
 use Horde\Cli\Modular\ModuleUsage;
-use Horde\Composer\RecursiveCopy;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use RuntimeException;
@@ -507,16 +506,21 @@ class Install implements Module, ModuleUsage
             $extractedDir = $discovered;
         }
 
-        $copy = new RecursiveCopy($extractedDir, $destinationDir);
-        $copy->copy();
+        // Move contents into the destination. rename() is the fast
+        // path when both trees share a filesystem; it falls back to a
+        // recursive copy on EXDEV ("Invalid cross-device link"), which
+        // Docker overlay mounts and tmpfs /tmp reliably trigger.
+        if (!$this->moveDirectoryContents($extractedDir, $destinationDir)) {
+            return false;
+        }
 
-        // Cleanup
-        @rmdir($extractedDir);
+        // Cleanup. Anything the copy fallback left behind still needs
+        // to go; rename would already have emptied these dirs.
+        $this->recursiveDelete($extractedDir);
         @rmdir($tmpExtract);
 
         return true;
     }
-
 
     /**
      * Locate a single top-level directory inside an extracted archive.
@@ -563,6 +567,128 @@ class Install implements Module, ModuleUsage
         }
 
         return $topLevelDirs[0];
+    }
+
+    /**
+     * Move every entry from a source directory into a destination directory.
+     *
+     * Uses `rename()` as the fast path when the source and destination
+     * share a filesystem, and falls back to a recursive copy on
+     * `EXDEV` ("Invalid cross-device link"). The fallback matches how
+     * `mv(1)` handles the same situation: attempt rename, copy on
+     * EXDEV, delete the source afterwards.
+     *
+     * The fast path is worth preserving because a Horde bundle is
+     * thousands of files. Doing a full byte-copy on every install just
+     * to handle the minority case where /tmp lives on a different
+     * mount would slow down every install.
+     *
+     * TODO: factor out into a shared utility. `horde-installer-plugin`
+     * carries a similar `Horde\Composer\RecursiveCopy` helper that
+     * wants extracting into a small standalone package so both this
+     * command and the plugin can share it without hordectl pulling in
+     * a Composer plugin as a runtime dependency.
+     *
+     * @param string $sourceDir Directory whose entries should be moved.
+     * @param string $destDir   Directory to move them into.
+     *                          Must already exist.
+     * @return bool True on success, false if any entry could not be
+     *              moved or copied.
+     */
+    private function moveDirectoryContents(string $sourceDir, string $destDir): bool
+    {
+        $entries = scandir($sourceDir);
+        if ($entries === false) {
+            return false;
+        }
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $src = $sourceDir . '/' . $entry;
+            $dst = $destDir . '/' . $entry;
+
+            // Fast path: same-filesystem rename. Suppress the warning
+            // so the EXDEV fallback stays quiet on cross-device moves.
+            if (@rename($src, $dst)) {
+                continue;
+            }
+
+            // Fallback: recursive copy. The source is deleted in a
+            // single pass after all entries have been copied, so
+            // failures here abort before we start pruning /tmp.
+            if (!$this->recursiveCopy($src, $dst)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Recursively copy a file or directory.
+     *
+     * Regular files and symlinks are copied with `copy()` (which
+     * follows symlinks — good enough for extracted release archives,
+     * which do not carry meaningful symlinks). Directories are
+     * mirrored, preserving their permissions on a best-effort basis.
+     *
+     * TODO: factor out (see {@see moveDirectoryContents()}).
+     *
+     * @param string $source Source path (file or directory).
+     * @param string $dest   Destination path.
+     * @return bool True on success.
+     */
+    private function recursiveCopy(string $source, string $dest): bool
+    {
+        if (is_dir($source)) {
+            if (!is_dir($dest) && !mkdir($dest, 0o755, true) && !is_dir($dest)) {
+                return false;
+            }
+            $entries = scandir($source);
+            if ($entries === false) {
+                return false;
+            }
+            foreach ($entries as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+                if (!$this->recursiveCopy($source . '/' . $entry, $dest . '/' . $entry)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return copy($source, $dest);
+    }
+
+    /**
+     * Recursively delete a file or directory tree.
+     *
+     * Best-effort cleanup for the extract-then-move sequence in
+     * {@see extractArchive()}. Errors are swallowed because the goal
+     * is to avoid leaving debris under /tmp, not to guarantee the
+     * tree is gone.
+     *
+     * @param string $path Path to remove.
+     */
+    private function recursiveDelete(string $path): void
+    {
+        if (is_dir($path) && !is_link($path)) {
+            $entries = @scandir($path);
+            if ($entries !== false) {
+                foreach ($entries as $entry) {
+                    if ($entry === '.' || $entry === '..') {
+                        continue;
+                    }
+                    $this->recursiveDelete($path . '/' . $entry);
+                }
+            }
+            @rmdir($path);
+            return;
+        }
+        @unlink($path);
     }
 
     /**
@@ -740,10 +866,12 @@ class Install implements Module, ModuleUsage
             $output = [];
             $return = 0;
 
-            // Create temporary tar file
+            // Create temporary tar file. Both paths live under
+            // sys_get_temp_dir() so this rename is same-filesystem and
+            // safe from EXDEV.
             $tmpFile = tempnam(sys_get_temp_dir(), 'horde_local_');
             $tarFile = $tmpFile . '.tar';
-            $this->xlink_rename($tmpFile, $tarFile);
+            rename($tmpFile, $tarFile);
 
             // Use git archive to export specific ref
             $cmd = sprintf(
