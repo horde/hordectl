@@ -67,8 +67,8 @@ class GenerateTest extends TestCase
         // This test verifies the command uses TargetCapabilityTrait
         // and constructs the correct conf.php path from target
 
-        $mockInjector = $this->createMock(Dependencies::class);
-        $mockCli = $this->createMock(Cli::class);
+        $mockInjector = $this->createStub(Dependencies::class);
+        $mockCli = $this->createStub(Cli::class);
 
         $mockInjector->method('getInstance')
             ->willReturnCallback(function ($class) use ($mockCli) {

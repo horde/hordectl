@@ -4,20 +4,18 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Test;
 
+use Horde\Cli\Modular\Module;
 use Horde\Hordectl\HordectlModuleTrait;
-use Horde_Cli_Modular_Module;
 use Horde\Argv\Parser;
 use Horde\Argv\Option;
 use Horde\Argv\OptionGroup;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
 /**
  * Test the HordectlModuleTrait
  * @coversNothing
  */
-#[AllowMockObjectsWithoutExpectations]
 class HordectlModuleTraitTest extends TestCase
 {
     private $trait;
@@ -25,7 +23,7 @@ class HordectlModuleTraitTest extends TestCase
     protected function setUp(): void
     {
         // Create an anonymous class that uses the trait and implements Module interface
-        $this->trait = new class implements Horde_Cli_Modular_Module {
+        $this->trait = new class implements Module {
             use HordectlModuleTrait;
 
             public function __construct()
@@ -58,7 +56,7 @@ class HordectlModuleTraitTest extends TestCase
 
     public function testIsRootModuleReturnsFalseWhenHasParent(): void
     {
-        $mockParent = $this->createMock(Horde_Cli_Modular_Module::class);
+        $mockParent = $this->createStub(Module::class);
         $this->trait->setParentModule($mockParent);
 
         $this->assertFalse($this->trait->isRootModule());
@@ -72,7 +70,7 @@ class HordectlModuleTraitTest extends TestCase
 
     public function testGetParentModuleReturnsSetParent(): void
     {
-        $mockParent = $this->createMock(Horde_Cli_Modular_Module::class);
+        $mockParent = $this->createStub(Module::class);
         $this->trait->setParentModule($mockParent);
 
         $parent = $this->trait->getParentModule();

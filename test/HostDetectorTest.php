@@ -42,7 +42,7 @@ class HostDetectorTest extends TestCase
     public function testAutoDetectAndAddHostCreatesHostTargetWhenHordeFound(): void
     {
         // Create mock finder that returns a valid path
-        $finder = $this->createMock(HordeInstallationFinder::class);
+        $finder = $this->createStub(HordeInstallationFinder::class);
         $finder->method('find')
             ->willReturn('/path/to/horde/vendor/horde/horde');
 
@@ -66,7 +66,7 @@ class HostDetectorTest extends TestCase
 
     public function testAutoDetectAndAddHostSetsCurrentTargetWhenNoOtherTargets(): void
     {
-        $finder = $this->createMock(HordeInstallationFinder::class);
+        $finder = $this->createStub(HordeInstallationFinder::class);
         $finder->method('find')
             ->willReturn('/path/to/horde/vendor/horde/horde');
 
@@ -91,7 +91,7 @@ class HostDetectorTest extends TestCase
         $this->config->set('current-target', null);
         $this->config->save();
 
-        $finder = $this->createMock(HordeInstallationFinder::class);
+        $finder = $this->createStub(HordeInstallationFinder::class);
         $finder->method('find')
             ->willReturn('/path/to/horde/vendor/horde/horde');
 
@@ -117,7 +117,7 @@ class HostDetectorTest extends TestCase
         $this->config->set('current-target', 'existing');
         $this->config->save();
 
-        $finder = $this->createMock(HordeInstallationFinder::class);
+        $finder = $this->createStub(HordeInstallationFinder::class);
         $finder->method('find')
             ->willReturn('/path/to/horde/vendor/horde/horde');
 
@@ -159,7 +159,7 @@ class HostDetectorTest extends TestCase
 
     public function testAutoDetectAndAddHostDoesNothingWhenHordeNotFound(): void
     {
-        $finder = $this->createMock(HordeInstallationFinder::class);
+        $finder = $this->createStub(HordeInstallationFinder::class);
         $finder->method('find')
             ->will($this->throwException(new HordeNotFoundException('Not found')));
 

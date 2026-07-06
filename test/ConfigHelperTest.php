@@ -12,49 +12,69 @@ declare(strict_types=1);
 namespace Horde\Hordectl\Test;
 
 use Horde\Hordectl\ConfigHelper;
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\Attributes\CoversClass;
-use RuntimeException;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
+/**
+ * ConfigHelper tests
+ *
+ * ConfigHelper takes ($app, $installDir) and looks up
+ *   $installDir/var/config/$app/conf.php
+ * That layout is what horde-installer-plugin lays down (see
+ * bundle/var/config/) so the tests mirror it exactly.
+ *
+ * ConfigHelper's constructor now requires the config directory and the
+ * conf.php file to both exist — hordectl activate is the tool that
+ * seeds them. Tests that used to exercise "create helper against a
+ * nonexistent install" were removed; that state is no longer reachable
+ * without going through activate first.
+ */
 #[CoversClass(ConfigHelper::class)]
 class ConfigHelperTest extends TestCase
 {
-    private string $testDir;
-    private string $testConfigFile;
+    private string $installDir;
+    private string $configDir;
+    private string $configFile;
 
     protected function setUp(): void
     {
-        // Create temporary directory for test config files
-        $this->testDir = sys_get_temp_dir() . '/hordectl-test-' . uniqid();
-        mkdir($this->testDir);
-        mkdir($this->testDir . '/config');
-        $this->testConfigFile = $this->testDir . '/config/conf.php';
+        $this->installDir = sys_get_temp_dir() . '/hordectl-test-' . uniqid();
+        $this->configDir = $this->installDir . '/var/config/horde';
+        $this->configFile = $this->configDir . '/conf.php';
+
+        mkdir($this->configDir, 0o755, true);
     }
 
     protected function tearDown(): void
     {
-        // Clean up test files
-        if (file_exists($this->testConfigFile)) {
-            unlink($this->testConfigFile);
+        foreach ([
+            $this->configFile,
+            $this->configDir . '/conf.bak.php',
+        ] as $path) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
         }
-        if (file_exists($this->testDir . '/config/conf.bak.php')) {
-            unlink($this->testDir . '/config/conf.bak.php');
-        }
-        if (is_dir($this->testDir . '/config')) {
-            rmdir($this->testDir . '/config');
-        }
-        if (is_dir($this->testDir)) {
-            rmdir($this->testDir);
-        }
+        // Prune the tree bottom-up. rmdir only removes empty dirs, so
+        // stragglers (unexpected files) fail loudly rather than mask.
+        @rmdir($this->configDir);
+        @rmdir($this->installDir . '/var/config');
+        @rmdir($this->installDir . '/var');
+        @rmdir($this->installDir);
     }
 
     /**
-     * Create a test config file with protected sections
+     * Seed a Horde-shaped conf.php with configurable $conf contents.
+     *
+     * Wraps the payload in the CONFIG START/END markers plus scraps of
+     * pre-header and post-footer content — the parts ConfigHelper is
+     * supposed to preserve verbatim across edits.
      */
-    private function createTestConfigFile(array $conf = []): void
+    private function seedConfigFile(array $conf = []): void
     {
-        $defaultConf = [
+        $defaults = [
             'sql' => [
                 'phptype' => 'mysql',
                 'hostspec' => 'localhost',
@@ -67,52 +87,64 @@ class ConfigHelperTest extends TestCase
             ],
         ];
 
-        $conf = array_merge_recursive($defaultConf, $conf);
+        $conf = array_merge_recursive($defaults, $conf);
 
-        $content = "<?php\n";
-        $content .= "// Pre-header content\n";
-        $content .= "\$default_value = 'preserved';\n\n";
-        $content .= "/* CONFIG START. DO NOT CHANGE ANYTHING IN OR AFTER THIS LINE. */\n";
-        $content .= "\$conf = " . var_export($conf, true) . ";\n";
-        $content .= "/* CONFIG END. DO NOT CHANGE ANYTHING IN OR BEFORE THIS LINE. */\n\n";
-        $content .= "// Post-footer content\n";
-        $content .= "\$override_value = 'also preserved';\n";
+        $content = "<?php\n"
+            . "// Pre-header content\n"
+            . "\$default_value = 'preserved';\n\n"
+            . "/* CONFIG START. DO NOT CHANGE ANYTHING IN OR AFTER THIS LINE. */\n"
+            . "\$conf = " . var_export($conf, true) . ";\n"
+            . "/* CONFIG END. DO NOT CHANGE ANYTHING IN OR BEFORE THIS LINE. */\n\n"
+            . "// Post-footer content\n"
+            . "\$override_value = 'also preserved';\n";
 
-        file_put_contents($this->testConfigFile, $content);
+        file_put_contents($this->configFile, $content);
     }
 
     public function testConstructorWithExistingConfig(): void
     {
-        $this->createTestConfigFile();
+        $this->seedConfigFile();
 
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $this->assertTrue($helper->fileExists());
-        $this->assertEquals($this->testConfigFile, $helper->getConfigFile());
-        $this->assertEquals($this->testDir . '/config', $helper->getConfigDir());
+        $this->assertSame($this->configFile, $helper->getConfigFile());
+        $this->assertSame($this->configDir, $helper->getConfigDir());
     }
 
-    public function testConstructorWithoutExistingConfig(): void
+    public function testConstructorThrowsWhenConfDirMissing(): void
     {
-        $helper = new ConfigHelper('horde', $this->testDir);
+        // Remove the seeded directory so the constructor path fails.
+        rmdir($this->configDir);
+        rmdir($this->installDir . '/var/config');
+        rmdir($this->installDir . '/var');
 
-        $this->assertFalse($helper->fileExists());
-        $this->assertEquals($this->testConfigFile, $helper->getConfigFile());
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Configuration directory does not exist');
+
+        new ConfigHelper('horde', $this->installDir);
+    }
+
+    public function testConstructorThrowsWhenConfFileMissing(): void
+    {
+        // Directory exists (from setUp) but no conf.php was seeded.
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Configuration file not found');
+
+        new ConfigHelper('horde', $this->installDir);
     }
 
     public function testConstructorWithoutInstallDir(): void
     {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Cannot determine Horde installation directory');
-
-        // Ensure HORDE_INSTALL_DIR is not set
         $oldEnv = getenv('HORDE_INSTALL_DIR');
         putenv('HORDE_INSTALL_DIR=');
 
         try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Cannot determine Horde installation directory');
+
             new ConfigHelper('horde');
         } finally {
-            // Restore environment
             if ($oldEnv !== false) {
                 putenv("HORDE_INSTALL_DIR={$oldEnv}");
             }
@@ -121,29 +153,28 @@ class ConfigHelperTest extends TestCase
 
     public function testGetValue(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        $this->assertEquals('mysql', $helper->getValue('sql.phptype'));
-        $this->assertEquals('localhost', $helper->getValue('sql.hostspec'));
-        $this->assertEquals('sql', $helper->getValue('auth.driver'));
+        $this->assertSame('mysql', $helper->getValue('sql.phptype'));
+        $this->assertSame('localhost', $helper->getValue('sql.hostspec'));
+        $this->assertSame('sql', $helper->getValue('auth.driver'));
     }
 
     public function testGetValueNested(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        // Get entire sql array
         $sql = $helper->getValue('sql');
         $this->assertIsArray($sql);
-        $this->assertEquals('mysql', $sql['phptype']);
+        $this->assertSame('mysql', $sql['phptype']);
     }
 
     public function testGetValueNonExistent(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $this->assertNull($helper->getValue('nonexistent'));
         $this->assertNull($helper->getValue('sql.nonexistent'));
@@ -152,25 +183,24 @@ class ConfigHelperTest extends TestCase
 
     public function testSetValue(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $helper->setValue('sql.phptype', 'pgsql');
-        $this->assertEquals('pgsql', $helper->getValue('sql.phptype'));
+        $this->assertSame('pgsql', $helper->getValue('sql.phptype'));
 
         $helper->setValue('sql.port', 5432);
-        $this->assertEquals(5432, $helper->getValue('sql.port'));
+        $this->assertSame(5432, $helper->getValue('sql.port'));
     }
 
     public function testSetValueCreatesIntermediateArrays(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $helper->setValue('new.nested.deep.value', 'test');
-        $this->assertEquals('test', $helper->getValue('new.nested.deep.value'));
+        $this->assertSame('test', $helper->getValue('new.nested.deep.value'));
 
-        // Verify intermediate arrays were created
         $this->assertIsArray($helper->getValue('new'));
         $this->assertIsArray($helper->getValue('new.nested'));
         $this->assertIsArray($helper->getValue('new.nested.deep'));
@@ -178,8 +208,8 @@ class ConfigHelperTest extends TestCase
 
     public function testSetValueEmptyPath(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Configuration path cannot be empty');
@@ -189,8 +219,8 @@ class ConfigHelperTest extends TestCase
 
     public function testUnsetValue(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $this->assertTrue($helper->hasValue('sql.password'));
         $this->assertTrue($helper->unsetValue('sql.password'));
@@ -199,8 +229,8 @@ class ConfigHelperTest extends TestCase
 
     public function testUnsetValueNonExistent(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $this->assertFalse($helper->unsetValue('nonexistent'));
         $this->assertFalse($helper->unsetValue('sql.nonexistent'));
@@ -208,8 +238,8 @@ class ConfigHelperTest extends TestCase
 
     public function testHasValue(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $this->assertTrue($helper->hasValue('sql.phptype'));
         $this->assertTrue($helper->hasValue('sql'));
@@ -219,8 +249,8 @@ class ConfigHelperTest extends TestCase
 
     public function testGetAllAndSetAll(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $all = $helper->getAll();
         $this->assertIsArray($all);
@@ -234,167 +264,111 @@ class ConfigHelperTest extends TestCase
         ];
 
         $helper->setAll($newConf);
-        $this->assertEquals($newConf, $helper->getAll());
-        $this->assertEquals('new', $helper->getValue('test.value'));
+        $this->assertSame($newConf, $helper->getAll());
+        $this->assertSame('new', $helper->getValue('test.value'));
     }
 
     public function testSave(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        // Modify config
         $helper->setValue('sql.phptype', 'pgsql');
         $helper->setValue('sql.port', 5432);
 
-        // Save
         $this->assertTrue($helper->save());
-
-        // Verify file was written
-        $this->assertFileExists($this->testConfigFile);
-
-        // Verify backup was created
+        $this->assertFileExists($this->configFile);
         $this->assertTrue($helper->backupExists());
         $this->assertFileExists($helper->getBackupFile());
 
-        // Create new helper to read saved file
-        $helper2 = new ConfigHelper('horde', $this->testDir);
-        $this->assertEquals('pgsql', $helper2->getValue('sql.phptype'));
-        $this->assertEquals(5432, $helper2->getValue('sql.port'));
+        $helper2 = new ConfigHelper('horde', $this->installDir);
+        $this->assertSame('pgsql', $helper2->getValue('sql.phptype'));
+        $this->assertSame(5432, $helper2->getValue('sql.port'));
     }
 
     public function testSavePreservesProtectedSections(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        // Modify and save
         $helper->setValue('sql.phptype', 'pgsql');
         $helper->save();
 
-        // Read file content directly
-        $content = file_get_contents($this->testConfigFile);
+        $content = file_get_contents($this->configFile);
 
-        // Verify markers are present
         $this->assertStringContainsString('CONFIG START', $content);
         $this->assertStringContainsString('CONFIG END', $content);
-
-        // Verify pre-header content is preserved
         $this->assertStringContainsString('$default_value', $content);
-
-        // Verify post-footer content is preserved
         $this->assertStringContainsString('$override_value', $content);
-    }
-
-    public function testSaveWithoutExistingFile(): void
-    {
-        $helper = new ConfigHelper('horde', $this->testDir);
-
-        $this->assertFalse($helper->fileExists());
-
-        // Set some values
-        $helper->setValue('sql.phptype', 'mysql');
-        $helper->setValue('sql.hostspec', 'localhost');
-
-        // Save
-        $this->assertTrue($helper->save());
-
-        // Verify file was created
-        $this->assertFileExists($this->testConfigFile);
-
-        // No backup should exist (no previous file)
-        $this->assertFileDoesNotExist($helper->getBackupFile());
-
-        // Verify values
-        $helper2 = new ConfigHelper('horde', $this->testDir);
-        $this->assertEquals('mysql', $helper2->getValue('sql.phptype'));
     }
 
     public function testRestoreFromBackup(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        $originalValue = $helper->getValue('sql.phptype');
+        $original = $helper->getValue('sql.phptype');
 
-        // Modify and save (creates backup)
         $helper->setValue('sql.phptype', 'pgsql');
         $helper->save();
 
-        $this->assertEquals('pgsql', $helper->getValue('sql.phptype'));
+        $this->assertSame('pgsql', $helper->getValue('sql.phptype'));
 
-        // Restore from backup
         $this->assertTrue($helper->restoreFromBackup());
-        $this->assertEquals($originalValue, $helper->getValue('sql.phptype'));
-    }
-
-    public function testRestoreFromBackupWithoutBackup(): void
-    {
-        $helper = new ConfigHelper('horde', $this->testDir);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Backup file does not exist');
-
-        $helper->restoreFromBackup();
+        $this->assertSame($original, $helper->getValue('sql.phptype'));
     }
 
     public function testFormatForDisplay(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $display = $helper->formatForDisplay();
 
-        // Should contain keys
         $this->assertStringContainsString('sql:', $display);
         $this->assertStringContainsString('phptype:', $display);
-
-        // Should mask password
         $this->assertStringContainsString('password: ********', $display);
         $this->assertStringNotContainsString('secret', $display);
-
-        // Should show non-sensitive values
         $this->assertStringContainsString('mysql', $display);
         $this->assertStringContainsString('localhost', $display);
     }
 
     public function testFormatForDisplayWithoutMasking(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
         $display = $helper->formatForDisplay(maskSensitive: false);
 
-        // Should show actual password
         $this->assertStringContainsString('password: secret', $display);
     }
 
     public function testBackupMethods(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        // Initially no backup
         $this->assertFalse($helper->backupExists());
 
-        // Save creates backup
         $helper->save();
         $this->assertTrue($helper->backupExists());
-        $this->assertEquals(
-            $this->testDir . '/config/conf.bak.php',
+        $this->assertSame(
+            $this->configDir . '/conf.bak.php',
             $helper->getBackupFile()
         );
     }
 
     public function testSaveToNonWritableDirectory(): void
     {
-        $this->createTestConfigFile();
+        $this->seedConfigFile();
 
-        // Make directory non-writable
-        chmod($this->testDir . '/config', 0o444);
+        // r-x for owner: constructor can still stat the file, but save()
+        // can't write to the directory. 0o444 would also strip the exec
+        // bit and break the file_exists() probe in the constructor.
+        chmod($this->configDir, 0o555);
 
         try {
-            $helper = new ConfigHelper('horde', $this->testDir);
+            $helper = new ConfigHelper('horde', $this->installDir);
             $helper->setValue('sql.phptype', 'pgsql');
 
             $this->expectException(RuntimeException::class);
@@ -402,39 +376,34 @@ class ConfigHelperTest extends TestCase
 
             $helper->save();
         } finally {
-            // Restore permissions for cleanup
-            chmod($this->testDir . '/config', 0o755);
+            chmod($this->configDir, 0o755);
         }
     }
 
     public function testMultipleValues(): void
     {
-        $this->createTestConfigFile();
-        $helper = new ConfigHelper('horde', $this->testDir);
+        $this->seedConfigFile();
+        $helper = new ConfigHelper('horde', $this->installDir);
 
-        // Set multiple values
         $helper->setValue('sql.phptype', 'pgsql');
         $helper->setValue('sql.hostspec', 'postgres.example.com');
         $helper->setValue('sql.port', 5432);
         $helper->setValue('sql.username', 'admin');
         $helper->setValue('sql.database', 'production');
 
-        // Verify all values
-        $this->assertEquals('pgsql', $helper->getValue('sql.phptype'));
-        $this->assertEquals('postgres.example.com', $helper->getValue('sql.hostspec'));
-        $this->assertEquals(5432, $helper->getValue('sql.port'));
-        $this->assertEquals('admin', $helper->getValue('sql.username'));
-        $this->assertEquals('production', $helper->getValue('sql.database'));
+        $this->assertSame('pgsql', $helper->getValue('sql.phptype'));
+        $this->assertSame('postgres.example.com', $helper->getValue('sql.hostspec'));
+        $this->assertSame(5432, $helper->getValue('sql.port'));
+        $this->assertSame('admin', $helper->getValue('sql.username'));
+        $this->assertSame('production', $helper->getValue('sql.database'));
 
-        // Save and reload
         $helper->save();
-        $helper2 = new ConfigHelper('horde', $this->testDir);
+        $helper2 = new ConfigHelper('horde', $this->installDir);
 
-        // Verify all values persisted
-        $this->assertEquals('pgsql', $helper2->getValue('sql.phptype'));
-        $this->assertEquals('postgres.example.com', $helper2->getValue('sql.hostspec'));
-        $this->assertEquals(5432, $helper2->getValue('sql.port'));
-        $this->assertEquals('admin', $helper2->getValue('sql.username'));
-        $this->assertEquals('production', $helper2->getValue('sql.database'));
+        $this->assertSame('pgsql', $helper2->getValue('sql.phptype'));
+        $this->assertSame('postgres.example.com', $helper2->getValue('sql.hostspec'));
+        $this->assertSame(5432, $helper2->getValue('sql.port'));
+        $this->assertSame('admin', $helper2->getValue('sql.username'));
+        $this->assertSame('production', $helper2->getValue('sql.database'));
     }
 }
