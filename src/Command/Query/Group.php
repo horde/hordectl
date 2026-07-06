@@ -2,6 +2,7 @@
 
 namespace Horde\Hordectl\Command\Query;
 
+use Exception;
 use Horde\Cli\Modular\Module;
 use Horde\Cli\Modular\ModuleUsage;
 use Horde\Argv\Parser;
@@ -88,12 +89,48 @@ class Group implements Module, ModuleUsage
                 $writer->addResource('builtin', 'group', $allGroups);
             }
         } catch (RuntimeException $e) {
-            $this->output->error(
-                sprintf('Error: %s', $e->getMessage())
-            );
+            $this->emitApiFailure($e);
+            return true;
+        } catch (Exception $e) {
+            $this->emitApiFailure($e);
             return true;
         }
 
         return true;
+    }
+
+    /**
+     * Print the shared "unable to query via REST API" block.
+     *
+     * Mirrors the shape used by Query\Apps, Query\Permission and
+     * Query\Registry. Consistent output helps admins diagnose config
+     * issues regardless of which subcommand tripped the failure.
+     */
+    private function emitApiFailure(Exception $e): void
+    {
+        $this->cli->writeln();
+        $this->output->error($e->getMessage());
+        $this->cli->writeln();
+        $this->cli->writeln('Unable to query groups via REST API.');
+        $this->cli->writeln('Please check:');
+        $this->cli->writeln('  - Admin API is enabled in Horde conf.php');
+        $this->cli->writeln('  - admin_secret is configured in hordectl.php or Horde conf.php');
+        $this->cli->writeln('  - Horde endpoint is accessible: ' . ($this->getEndpoint() ?? 'not configured'));
+        $this->cli->writeln();
+    }
+
+    /**
+     * Get configured endpoint for error messages
+     *
+     * @return string|null
+     */
+    private function getEndpoint(): ?string
+    {
+        try {
+            $configManager = new \Horde\Hordectl\ConfigManager();
+            return $configManager->get('admin_api')['endpoint'] ?? null;
+        } catch (Exception $e) {
+            return null;
+        }
     }
 }

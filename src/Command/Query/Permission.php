@@ -90,28 +90,60 @@ class Permission implements Module, ModuleUsage
                 $writer->addResource('builtin', 'permission', $items);
             }
         } catch (RuntimeException $e) {
-            // Check if it's a 404 error (permission not found)
+            // 404 gets a targeted message; everything else falls
+            // through to the shared "unable to query via REST API"
+            // block so the user sees the same troubleshooting hints
+            // query apps and query registry emit.
             if (strpos($e->getMessage(), 'PERMISSION_NOT_FOUND') !== false) {
+                $this->cli->writeln();
                 $this->output->error(
                     sprintf('Permission "%s" not found', $argv[1] ?? 'unknown')
                 );
-            } else {
-                $this->output->error(
-                    sprintf('Error querying permissions: %s', $e->getMessage())
-                );
-                // Re-throw for debugging
-                throw $e;
+                $this->cli->writeln();
+                return true;
             }
-            return false;
+            $this->emitApiFailure($e);
+            return true;
         } catch (Exception $e) {
-            $this->output->error(
-                sprintf('Error querying permissions: %s', $e->getMessage())
-            );
-            // Re-throw for debugging
-            throw $e;
-            return false;
+            $this->emitApiFailure($e);
+            return true;
         }
 
         return true;
+    }
+
+    /**
+     * Print the shared "unable to query via REST API" block.
+     *
+     * Mirrors the shape used by Query\Apps and Query\Registry.
+     * Consistent output helps admins diagnose config issues
+     * regardless of which subcommand tripped the failure.
+     */
+    private function emitApiFailure(Exception $e): void
+    {
+        $this->cli->writeln();
+        $this->output->error($e->getMessage());
+        $this->cli->writeln();
+        $this->cli->writeln('Unable to query permissions via REST API.');
+        $this->cli->writeln('Please check:');
+        $this->cli->writeln('  - Admin API is enabled in Horde conf.php');
+        $this->cli->writeln('  - admin_secret is configured in hordectl.php or Horde conf.php');
+        $this->cli->writeln('  - Horde endpoint is accessible: ' . ($this->getEndpoint() ?? 'not configured'));
+        $this->cli->writeln();
+    }
+
+    /**
+     * Get configured endpoint for error messages
+     *
+     * @return string|null
+     */
+    private function getEndpoint(): ?string
+    {
+        try {
+            $configManager = new \Horde\Hordectl\ConfigManager();
+            return $configManager->get('admin_api')['endpoint'] ?? null;
+        } catch (Exception $e) {
+            return null;
+        }
     }
 }
