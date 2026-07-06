@@ -4,140 +4,79 @@ declare(strict_types=1);
 
 namespace Horde\Hordectl\Test;
 
-use Horde\Hordectl\Cli;
-use Horde\Injector\Injector;
-use Horde_Cli;
 use Horde\Argv\Parser;
-use PHPUnit\Framework\TestCase;
+use Horde\Cli\Cli as HordeCli;
+use Horde\Hordectl\Cli;
+use Horde\Hordectl\Dependencies;
+use Horde\Injector\TopLevel;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
-use Horde_Cli_Modular_Module;
+use PHPUnit\Framework\TestCase;
 
 /**
- * Test the main Cli class
+ * Test the root Cli module
+ *
+ * Cli is the root of hordectl's modular CLI tree. Its constructor asks the
+ * injector for Horde\Cli\Cli and Horde\Argv\Parser, then auto-discovers
+ * every Command/*.php file via HasModulesTrait::_initModules — instantiating
+ * each one through the injector.
+ *
+ * Rather than mocking the whole discovery surface (which requires stubbing
+ * getInstance() responses for every Command class the trait discovers), we
+ * use a real Dependencies container. Real getInstance() calls resolve the
+ * command classes for us; we only substitute Horde\Cli\Cli and Parser at
+ * the injector level so we can observe writeln() and property state.
  */
 #[CoversClass(Cli::class)]
-#[AllowMockObjectsWithoutExpectations]
 class CliTest extends TestCase
 {
-    private $mockInjector;
-    private $mockCli;
-    private $mockParser;
+    private Dependencies $dependencies;
+    private Parser $parser;
 
     protected function setUp(): void
     {
-        $this->mockInjector = $this->createMock(Injector::class);
-        $this->mockCli = $this->createMock(Horde_Cli::class);
-        $this->mockParser = $this->createMock(Parser::class);
+        $this->dependencies = new Dependencies(new TopLevel());
+        $this->parser = new Parser();
 
-        // Setup default mock behavior
-        $this->mockInjector->method('getInstance')
-            ->willReturnCallback(function ($class) {
-                if ($class === '\Horde_Cli') {
-                    return $this->mockCli;
-                }
-                if ($class === '\Horde_Argv_Parser' || $class === Parser::class) {
-                    return $this->mockParser;
-                }
-                // Return a simple stub for Command classes
-                if (str_starts_with($class, '\Horde\Hordectl\Command\\')) {
-                    return new class implements Horde_Cli_Modular_Module {
-                        public function setParentModule($module) {}
-                        public function handle($argv)
-                        {
-                            return false;
-                        }
-                        public function getUsage(): string
-                        {
-                            return '';
-                        }
-                        public function getBaseOptions()
-                        {
-                            return [];
-                        }
-                        public function hasOptionGroup()
-                        {
-                            return false;
-                        }
-                        public function getOptionGroupTitle()
-                        {
-                            return '';
-                        }
-                        public function getOptionGroupDescription()
-                        {
-                            return '';
-                        }
-                        public function getOptionGroupOptions($action = null)
-                        {
-                            return [];
-                        }
-                    };
-                }
-                return null;
-            });
+        // The tests that don't verify interactions on the CLI stub it out.
+        // testHandleReturnsFalseWhenNoModuleHandles wants writeln expectations,
+        // so it replaces the stub with its own mock before instantiating Cli.
+        $this->dependencies->setInstance(HordeCli::class, $this->createStub(HordeCli::class));
+        $this->dependencies->setInstance(Parser::class, $this->parser);
     }
 
     public function testConstructorCreatesCliInstance(): void
     {
-        $cli = new Cli($this->mockInjector);
+        $cli = new Cli($this->dependencies);
         $this->assertInstanceOf(Cli::class, $cli);
     }
 
-    public function testConstructorGetsCliFromInjector(): void
+    public function testConstructorDisablesInterspersedArgsOnParser(): void
     {
-        $this->mockInjector->expects($this->atLeastOnce())
-            ->method('getInstance')
-            ->with($this->logicalOr(
-                $this->equalTo('\Horde_Cli'),
-                $this->stringStartsWith('\Horde\Hordectl\Command\\'),
-                $this->equalTo(Parser::class)
-            ));
-
-        new Cli($this->mockInjector);
+        new Cli($this->dependencies);
+        $this->assertFalse($this->parser->allowInterspersedArgs);
     }
 
-    public function testConstructorGetsParserFromInjector(): void
+    public function testConstructorDiscoversCommandModules(): void
     {
-        $this->mockInjector->expects($this->atLeastOnce())
-            ->method('getInstance')
-            ->with($this->logicalOr(
-                $this->equalTo(Parser::class),
-                $this->stringStartsWith('\Horde\Hordectl\Command\\'),
-                $this->equalTo('\Horde_Cli')
-            ));
+        $cli = new Cli($this->dependencies);
 
-        new Cli($this->mockInjector);
+        // Every file under src/Command/*.php becomes a module. At minimum
+        // the tree ships help, version, install, activate, configure,
+        // create, patch, query, secret, target, test, import — a dozen or
+        // more. Assert at least a handful were discovered.
+        $this->assertGreaterThanOrEqual(5, $cli->count());
     }
 
-    public function testConstructorSetsParserToNotAllowInterspersedArgs(): void
+    public function testHandleReturnsFalseWhenNoModuleHandles(): void
     {
-        // The parser should have allowInterspersedArgs set to false
-        // Use the mock parser from setUp() since we can't override the mock behavior
-        new Cli($this->mockInjector);
+        // Replace the stub CLI with a mock that verifies showUsage() ran.
+        // All shipped modules return false on empty argv, so Cli::handle
+        // falls into showUsage() and returns false.
+        $cliMock = $this->createMock(HordeCli::class);
+        $cliMock->expects($this->atLeastOnce())->method('writeln');
+        $this->dependencies->setInstance(HordeCli::class, $cliMock);
 
-        $this->assertFalse($this->mockParser->allowInterspersedArgs);
-    }
-
-    public function testHandleReturnsFalseWhenNoModulesRun(): void
-    {
-        $cli = new Cli($this->mockInjector);
-
-        // Expect usage output when no module runs (via writeln calls)
-        $this->mockCli->expects($this->atLeastOnce())
-            ->method('writeln');
-
-        $result = $cli->handle([]);
-        $this->assertFalse($result);
-    }
-
-    public function testHandleReturnsFalseOnHordeException(): void
-    {
-        // This tests exception handling in the handle method
-        $cli = new Cli($this->mockInjector);
-
-        // Since we can't easily make modules throw exceptions in this test,
-        // we just verify the method doesn't crash with empty args
-        $result = $cli->handle([]);
-        $this->assertIsBool($result);
+        $cli = new Cli($this->dependencies);
+        $this->assertFalse($cli->handle([]));
     }
 }

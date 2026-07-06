@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Horde\Hordectl\Test\Command\Target;
 
 use Horde\Argv\Parser;
+use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\Command\Target\Current;
 use Horde\Hordectl\Command\Target\Delete;
 use Horde\Hordectl\Command\Target\ListTargets;
@@ -13,8 +14,8 @@ use Horde\Hordectl\Command\Target\Show;
 use Horde\Hordectl\Command\Target\UseTarget;
 use Horde\Hordectl\ConfigManager;
 use Horde\Hordectl\Dependencies;
+use Horde\Hordectl\Output;
 use Horde\Hordectl\TargetResolver;
-use Horde_Cli;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -37,22 +38,27 @@ class TargetCommandsTest extends TestCase
         $this->testConfigPath = sys_get_temp_dir() . '/hordectl-test-' . uniqid() . '.php';
         $this->config = new ConfigManager($this->testConfigPath);
 
-        // Create mocks
-        $this->mockInjector = $this->createMock(Dependencies::class);
-        $this->mockCli = $this->createMock(Horde_Cli::class);
+        // Stubs: neither CLI nor Parser are asserted against; each Target
+        // subcommand just needs them injected so its constructor doesn't
+        // fatal on null property assignment.
+        $this->mockInjector = $this->createStub(Dependencies::class);
+        $this->mockCli = $this->createStub(HordeCli::class);
         $this->mockParser = new Parser();
 
-        // Setup mock injector to return dependencies
         $this->mockInjector->method('getInstance')
             ->willReturnCallback(function ($class) {
-                if ($class === '\Horde_Cli' || $class === Horde_Cli::class) {
+                if ($class === HordeCli::class) {
                     return $this->mockCli;
                 }
-                if ($class === Parser::class || $class === '\Horde\Argv\Parser') {
+                if ($class === Parser::class) {
                     return $this->mockParser;
                 }
                 return null;
             });
+
+        // Return a real Output wrapping the stubbed CLI; the SUTs call it.
+        $this->mockInjector->method('createOutput')
+            ->willReturn(new Output($this->mockCli));
 
         // Create test targets
         $this->config->set('current-target', 'test1');
