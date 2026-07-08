@@ -509,8 +509,40 @@ jobs:
             sudo cat /var/log/nginx/access.log 2>/dev/null || echo "no nginx access.log"
           fi
           echo ""
+          echo "=== Live HTTP probes (what the endpoint actually serves) ==="
+          # These probes run at diagnostic time, so they reveal exactly
+          # what the webserver responds with when a step above claimed
+          # the endpoint wasn't ready. Each dumps headers plus a
+          # response body preview so subpath vs root routing bugs and
+          # PHP 500s are equally easy to spot.
+          for probe in \
+            'http://localhost/' \
+            'http://localhost/horde/' \
+            'http://localhost/horde/observability/readiness' \
+            'http://localhost/horde/api/v1/admin/info'; do
+            echo "--- $probe ---"
+            curl -sS -o /tmp/probe.body -w 'HTTP %{http_code}  size %{size_download}b\n' \
+              "$probe" 2>&1 || echo "curl failed"
+            echo "body:"
+            head -c 400 /tmp/probe.body
+            echo
+            echo
+          done
           echo "=== PHP-FPM error log ==="
           sudo cat /var/log/php8.4-fpm.log 2>/dev/null || echo "No FPM log"
+          echo ""
+          echo "=== Generated web server config actually loaded ==="
+          if [ "${{ matrix.webserver }}" = "apache2" ]; then
+            sudo cat /etc/apache2/sites-available/horde.conf 2>/dev/null || echo "no horde.conf"
+            echo ""
+            echo "=== horde-includes/apps/horde.conf ==="
+            sudo cat /etc/apache2/horde-includes/apps/horde.conf 2>/dev/null || echo "no horde app conf"
+          else
+            sudo cat /etc/nginx/sites-available/horde.conf 2>/dev/null || echo "no horde.conf"
+            echo ""
+            echo "=== horde-includes/apps/horde.conf ==="
+            sudo cat /etc/nginx/horde-includes/apps/horde.conf 2>/dev/null || echo "no horde app conf"
+          fi
           echo ""
           echo "=== Horde Config ==="
           sudo cat /var/www/horde/var/config/horde/conf.php || echo "No conf.php"
