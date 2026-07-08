@@ -134,23 +134,15 @@ jobs:
           # The bundle's shipped registry places horde at /horde/ and
           # every other app at /<app>/. No --app-webroots overrides:
           # matching the shipped layout keeps rampage's route table
-          # consistent with what the URLs actually resolve to.
+          # consistent with what the URLs actually resolve to. Tier-3
+          # emitter derives the vhost DocumentRoot from --root-bundle-path
+          # so the site serves /horde/*, /imp/*, /static/*, ... directly.
           sudo mkdir -p /var/www/horde/var/webserver
           sudo ./bin/hordectl webserver-config apache-vhost \
             --default-url=http://localhost \
             --root-bundle-path=/var/www/horde \
             --output-dir=/var/www/horde/var/webserver/apache-vhost \
             --force
-
-          # For a vanilla single-vhost install the DocumentRoot is
-          # the bundle's web/ directory (which holds web/horde/,
-          # web/imp/, web/static/, ...). The generator emits a
-          # commented-out placeholder when no app is root-anchored;
-          # swap that for the real bundle web root so /horde/*,
-          # /imp/*, /static/*, ... all resolve.
-          sudo sed -i \
-            's|# DocumentRoot /var/www/html|DocumentRoot /var/www/horde/web|' \
-            /var/www/horde/var/webserver/apache-vhost/sites/localhost.conf
 
       - name: Configure Apache web server
         if: matrix.webserver == 'apache2'
@@ -194,21 +186,14 @@ jobs:
           # Same tier-3 synthesis as the Apache branch. The generator
           # detects nginx-specific conventions (fastcgi_pass, PHP
           # location block, HTTP_AUTHORIZATION passthrough) from the
-          # flavor name.
+          # flavor name. Tier-3 also derives the server-level `root`
+          # from --root-bundle-path.
           sudo mkdir -p /var/www/horde/var/webserver
           sudo ./bin/hordectl webserver-config nginx \
             --default-url=http://localhost \
             --root-bundle-path=/var/www/horde \
             --output-dir=/var/www/horde/var/webserver/nginx \
             --force
-
-          # nginx equivalent of the DocumentRoot fixup: replace the
-          # commented-out `root` placeholder with the real bundle
-          # web root so /horde/*, /imp/*, /static/* all resolve.
-          # See the same rationale documented above the Apache sed.
-          sudo sed -i \
-            's|# root /var/www/html;|root /var/www/horde/web;|' \
-            /var/www/horde/var/webserver/nginx/sites/localhost.conf
 
       - name: Configure nginx web server
         if: matrix.webserver == 'nginx'

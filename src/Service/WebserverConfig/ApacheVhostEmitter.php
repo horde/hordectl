@@ -47,7 +47,7 @@ final class ApacheVhostEmitter
             $hostLabel = $host === '_default_' ? ($map->defaultHost ?: 'default') : $host;
             $entries[] = new EmitEntry(
                 $outputDir . '/sites/' . $hostLabel . '.conf',
-                $this->renderSite($hostLabel, $apps, $phpHandlerSpec, $serverroot),
+                $this->renderSite($hostLabel, $apps, $phpHandlerSpec, $serverroot, $map->bundleWebRoot),
             );
             if ($this->render->anyTls($apps)) {
                 $entries[] = new EmitEntry(
@@ -138,7 +138,7 @@ final class ApacheVhostEmitter
     /**
      * @param list<AppEntry> $apps
      */
-    private function renderSite(string $host, array $apps, string $phpHandlerSpec, string $serverroot): string
+    private function renderSite(string $host, array $apps, string $phpHandlerSpec, string $serverroot, string $bundleWebRoot = ''): string
     {
         [$handlerDirective, $handlerLabel] = $this->render->phpHandler($phpHandlerSpec, 'apache');
         $anyTls = $this->render->anyTls($apps);
@@ -205,9 +205,16 @@ final class ApacheVhostEmitter
         $body .= '    ServerName ' . $host . "\n";
         if ($rootApp !== null) {
             $body .= '    DocumentRoot ' . $rootApp->fileroot . "\n";
+        } elseif ($bundleWebRoot !== '') {
+            // Tier-3 knows the bundle web root; that's the natural
+            // vhost docroot when no app owns `/`. Everything under
+            // `<bundle>/web/` (horde/, imp/, static/, js/, themes/)
+            // resolves under /<app>/, /static/*, /js/* etc.
+            $body .= '    DocumentRoot ' . $bundleWebRoot . "\n";
         } else {
-            $body .= "    # No root-anchored app on this host. Set DocumentRoot manually\n";
-            $body .= "    # or add an --app-webroots entry pointing an app at " . $host . "/.\n";
+            $body .= "    # No root-anchored app on this host and no bundle web\n";
+            $body .= "    # root known (live-registry / stdin tiers). Set DocumentRoot\n";
+            $body .= "    # manually or regenerate with --root-bundle-path.\n";
             $body .= "    # DocumentRoot /var/www/html\n";
         }
         $body .= "\n";
