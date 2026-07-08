@@ -108,6 +108,38 @@ jobs:
 
           echo "✅ Installation directory structure validated"
 
+      - name: Generate Apache vhost via webserver-config
+        run: |
+          set -ex
+
+          # Dogfood: the vhost that Apache loads comes from hordectl
+          # itself, not from a hand-maintained fixture. Tier-3
+          # synthesis (--default-url + --root-bundle-path) is right
+          # here because the target's live registry isn't reachable
+          # yet — hordectl has extracted the bundle but Apache isn't
+          # up.
+          #
+          # The bundle's shipped registry places horde at /horde/ and
+          # every other app at /<app>/. No --app-webroots overrides:
+          # matching the shipped layout keeps rampage's route table
+          # consistent with what the URLs actually resolve to.
+          sudo mkdir -p /var/www/horde/var/webserver
+          sudo ./bin/hordectl webserver-config apache-vhost \
+            --default-url=http://localhost \
+            --root-bundle-path=/var/www/horde \
+            --output-dir=/var/www/horde/var/webserver/apache-vhost \
+            --force
+
+          # For a vanilla single-vhost install the DocumentRoot is
+          # the bundle's web/ directory (which holds web/horde/,
+          # web/imp/, web/static/, ...). The generator emits a
+          # commented-out placeholder when no app is root-anchored;
+          # swap that for the real bundle web root so /horde/*,
+          # /imp/*, /static/*, ... all resolve.
+          sudo sed -i \
+            's|# DocumentRoot /var/www/html|DocumentRoot /var/www/horde/web|' \
+            /var/www/horde/var/webserver/apache-vhost/sites/localhost.conf
+
       - name: Configure Apache web server
         run: |
           set -ex
@@ -116,17 +148,23 @@ jobs:
           sudo systemctl start php8.4-fpm
           sudo systemctl enable php8.4-fpm
 
-          # Copy vhost config
-          sudo cp test/fixtures/apache-horde.conf /etc/apache2/sites-available/horde.conf
-
           # Enable required modules
           sudo a2enmod rewrite
           sudo a2enmod proxy_fcgi
           sudo a2enmod setenvif
 
+          # Drop the hordectl-generated tree into place. sites/ files
+          # go into sites-available; horde-includes/ goes under
+          # ServerRoot so the vhost's absolute Include lines resolve.
+          sudo cp -r /var/www/horde/var/webserver/apache-vhost/horde-includes /etc/apache2/
+          sudo cp /var/www/horde/var/webserver/apache-vhost/sites/localhost.conf /etc/apache2/sites-available/horde.conf
+
           # Enable site
           sudo a2dissite 000-default
           sudo a2ensite horde
+
+          # Sanity check the generated config before we reload.
+          sudo apachectl configtest
 
           # Restart Apache to apply all changes
           sudo systemctl restart apache2
@@ -168,7 +206,9 @@ jobs:
         run: |
           set -ex
 
-          sudo ./bin/hordectl configure session --cookie-domain='' --type=builtin
+          sudo ./bin/hordectl configure session \
+            --cookie-domain='' --type=builtin \
+            --ensure-session-secret
 
       - name: Configure authentication
         run: |
@@ -182,8 +222,82 @@ jobs:
         run: |
           set -ex
 
-          sudo ./bin/hordectl target update horde --endpoint=http://localhost
+          sudo ./bin/hordectl target update horde --endpoint=http://localhost/horde
+          # `secret generate` produces a cryptographically random 128-char
+          # secret via ConfigFileWriter::generateSecret() and syncs it to
+          # both /var/www/horde/var/config/horde/conf.php and the local
+          # target config, so this is already a fresh per-CI-run secret.
+          # No fixed keys anywhere in this workflow.
           sudo ./bin/hordectl secret generate
+
+      - name: Verify admin API readiness
+        run: |
+          set -ex
+
+          # Locate the target config file. `sudo` under GitHub Actions
+          # preserves $HOME from the invoking user by default, so the
+          # file may land under /home/runner/ rather than /root/.
+          # Check both.
+          CONFIG=""
+          for candidate in /root/.config/horde/hordectl.php /home/runner/.config/horde/hordectl.php; do
+            if sudo test -f "$candidate"; then
+              CONFIG="$candidate"
+              break
+            fi
+          done
+          if [ -z "$CONFIG" ]; then
+            echo "❌ hordectl target config not found in either $HOME location"
+            sudo find / -name hordectl.php 2>/dev/null | head
+            exit 1
+          fi
+          echo "Using target config: $CONFIG"
+
+          # Extract the freshly-generated secret. The file is a PHP-array
+          # export, so we ask PHP to load it rather than regex-parsing.
+          SECRET=$(sudo php -r "
+            \$c = require '$CONFIG';
+            \$current = \$c['current-target'] ?? '';
+            \$t = \$c['targets'][\$current] ?? [];
+            echo \$t['admin_secret'] ?? '';
+          ")
+          if [ -z "$SECRET" ]; then
+            echo "❌ Could not extract admin_secret from target config"
+            sudo ls -la "$(dirname "$CONFIG")" || true
+            exit 1
+          fi
+          echo "::add-mask::$SECRET"
+          # Save for later steps so they don't have to re-locate.
+          echo "HORDECTL_CONFIG=$CONFIG" >> "$GITHUB_ENV"
+
+          # Hit the readiness route directly with curl. The bundle's
+          # shipped registry places horde at /horde/, so the admin
+          # routes live at /horde/api/v1/admin/*. Retries handle the
+          # small window between secret write and Apache picking up
+          # the config change.
+          for attempt in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -sS -o /tmp/info.json -w '%{http_code}' \
+              -H "Authorization: Bearer $SECRET" \
+              http://localhost/horde/api/v1/admin/info || echo "curl-failed")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ /horde/api/v1/admin/info returned 200 on attempt $attempt"
+              break
+            fi
+            echo "  attempt $attempt: HTTP $HTTP_CODE"
+            if [ "$attempt" = "5" ]; then
+              echo "❌ /horde/api/v1/admin/info never became ready"
+              cat /tmp/info.json || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Sanity check: response should carry the version field.
+          grep -q '"version"' /tmp/info.json || {
+            echo "❌ /horde/api/v1/admin/info response missing version field"
+            cat /tmp/info.json
+            exit 1
+          }
+          echo "✅ Readiness route responded with expected shape"
 
       - name: Create test user
         run: |
@@ -191,13 +305,111 @@ jobs:
 
           sudo ./bin/hordectl create user --username=administrator --password=admin123
 
+      - name: Exercise admin API through hordectl
+        run: |
+          set -ex
+
+          # Each of these queries goes through the admin API (Bearer
+          # auth). Failure here means the API endpoint, auth, or the
+          # command's request wiring is broken.
+          echo "--- query apps ---"
+          sudo ./bin/hordectl query apps | head -30
+
+          echo "--- query registry (head) ---"
+          sudo ./bin/hordectl query registry | head -30
+
+          echo "--- query user administrator ---"
+          sudo ./bin/hordectl query user administrator | head -20
+
+          echo "--- query group ---"
+          sudo ./bin/hordectl query group | head -20 || echo "no groups yet"
+
+          echo "✅ Admin API round-trips succeeded"
+
       - name: Run subsystem tests
         run: |
           set -ex
 
-          sudo ./bin/hordectl test db
-          sudo ./bin/hordectl test session
-          sudo ./bin/hordectl test auth
+          # `test all` exercises every subsystem (db, cache, session,
+          # logger, auth, jwt) in one call. Replaces the earlier ad-hoc
+          # per-subsystem invocations.
+          sudo ./bin/hordectl test all
+
+      - name: Smoke-test the new subcommands
+        run: |
+          set -ex
+
+          # Every subcommand added since the previous CI cut is
+          # touched at least once so we notice regressions in the
+          # basic invocation path.
+
+          echo "--- translation binaries ---"
+          sudo ./bin/hordectl translation binaries
+
+          echo "--- webserver-config apache-vhost from live registry ---"
+          sudo mkdir -p /var/www/horde/var/webserver-ci
+          sudo ./bin/hordectl webserver-config apache-vhost \
+            --output-dir=/var/www/horde/var/webserver-ci/apache
+
+          # Confirm the expected tree took shape.
+          test -f /var/www/horde/var/webserver-ci/apache/README.md || {
+            echo "❌ webserver-config did not emit README.md"
+            exit 1
+          }
+          test -d /var/www/horde/var/webserver-ci/apache/sites || exit 1
+          test -d /var/www/horde/var/webserver-ci/apache/horde-includes/apps || exit 1
+          echo "✅ webserver-config wrote sites/ + horde-includes/ tree"
+
+          echo "--- webserver-config nginx from vanilla defaults ---"
+          sudo ./bin/hordectl webserver-config nginx \
+            --default-url=http://localhost \
+            --root-bundle-path=/var/www/horde \
+            --output-dir=/var/www/horde/var/webserver-ci/nginx
+
+          test -f /var/www/horde/var/webserver-ci/nginx/README.md || exit 1
+          # Reproducer command must appear in the README's provenance
+          # block — this is our regression guard for the tier-aware
+          # readme rendering.
+          sudo grep -q "hordectl webserver-config nginx --default-url=http://localhost" \
+            /var/www/horde/var/webserver-ci/nginx/README.md || {
+              echo "❌ nginx README did not carry the reproducer command"
+              sudo cat /var/www/horde/var/webserver-ci/nginx/README.md | head -50
+              exit 1
+            }
+          echo "✅ nginx provenance carries the correct reproducer"
+
+          echo "--- webserver-config apache-vhost: live registry + --default-url override ---"
+          # Mix-and-match tier: fetch the real registry, anchor every
+          # relative webroot at http://localhost. Proves the tier-1
+          # path threads through applyOverrides() correctly.
+          sudo ./bin/hordectl webserver-config apache-vhost \
+            --default-url=http://localhost \
+            --output-dir=/var/www/horde/var/webserver-ci/apache-anchored \
+            --force
+
+          # After anchoring, horde's webroot should be
+          # http://localhost/horde/ (registry says /horde/, anchor adds
+          # scheme+host). Grep an app snippet to confirm the promotion.
+          sudo grep -q '^# Webroot: http://localhost' \
+            /var/www/horde/var/webserver-ci/apache-anchored/horde-includes/apps/horde.conf || {
+              echo "❌ live-registry + --default-url did not anchor webroots"
+              sudo head -25 /var/www/horde/var/webserver-ci/apache-anchored/horde-includes/apps/horde.conf
+              exit 1
+            }
+          # Provenance banner must still say "live registry" — the
+          # override doesn't change which tier resolved the base map.
+          sudo grep -q 'reading the installation.*live' \
+            /var/www/horde/var/webserver-ci/apache-anchored/README.md || {
+              echo "❌ anchored README did not identify as live-registry tier"
+              exit 1
+            }
+          # Reproducer must include the --default-url override.
+          sudo grep -qF -- '--default-url=http://localhost' \
+            /var/www/horde/var/webserver-ci/apache-anchored/README.md || {
+              echo "❌ anchored README missing --default-url in reproducer"
+              exit 1
+            }
+          echo "✅ live-registry + --default-url override threaded through"
 
       - name: Verify web accessibility
         run: |
@@ -226,3 +438,37 @@ jobs:
           echo ""
           echo "=== Horde Config ==="
           sudo cat /var/www/horde/var/config/horde/conf.php || echo "No conf.php"
+          echo ""
+          echo "=== Readiness curl payload (if captured) ==="
+          sudo cat /tmp/info.json 2>/dev/null || echo "no /tmp/info.json"
+          echo ""
+          echo "=== hordectl target current ==="
+          sudo ./bin/hordectl target current || echo "target current failed"
+          echo ""
+          echo "=== hordectl target config (masked) ==="
+          # Mask the admin_secret before dumping so a failure log
+          # cannot leak the fresh CI-session token. HORDECTL_CONFIG is
+          # set by the "Verify admin API readiness" step; when the
+          # failure happened earlier, fall back to a filesystem search.
+          CONFIG="${HORDECTL_CONFIG:-}"
+          if [ -z "$CONFIG" ] || ! sudo test -f "$CONFIG"; then
+            CONFIG=$(sudo find /root /home/runner -name hordectl.php 2>/dev/null | head -1)
+          fi
+          if [ -n "$CONFIG" ] && sudo test -f "$CONFIG"; then
+            sudo php -r "
+              \$c = @require '$CONFIG';
+              if (!is_array(\$c)) { echo '(no target config)' . PHP_EOL; exit; }
+              foreach ((\$c['targets'] ?? []) as \$name => \$t) {
+                if (isset(\$t['admin_secret']) && \$t['admin_secret'] !== '') {
+                  \$t['admin_secret'] = '(masked)';
+                }
+                echo \$name . ': ' . json_encode(\$t, JSON_PRETTY_PRINT) . PHP_EOL;
+              }
+            " || echo "config dump failed"
+          else
+            echo "(no target config found)"
+          fi
+          echo ""
+          echo "=== webserver-config trees (if generated) ==="
+          sudo ls -la /var/www/horde/var/webserver-ci/apache/ 2>/dev/null || echo "no apache tree"
+          sudo ls -la /var/www/horde/var/webserver-ci/nginx/ 2>/dev/null || echo "no nginx tree"
