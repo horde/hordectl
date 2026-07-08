@@ -40,7 +40,7 @@ final class NginxEmitter
         foreach ($map->apps as $app) {
             $entries[] = new EmitEntry(
                 $outputDir . '/horde-includes/apps/' . $app->id . '.conf',
-                $this->renderAppSnippet($app),
+                $this->renderAppSnippet($app, $phpHandlerSpec),
             );
         }
         $byHost = $this->groupByHost($map);
@@ -74,30 +74,45 @@ final class NginxEmitter
         return $out;
     }
 
-    private function renderAppSnippet(AppEntry $app): string
+    private function renderAppSnippet(AppEntry $app, string $phpHandlerSpec): string
     {
+        [$fastcgiDirective] = $this->render->phpHandler($phpHandlerSpec, 'nginx');
+        $frontController = $this->render->frontControllerFor($app);
+        $pathPrefix = rtrim($app->pathPrefix(), '/');
+        // For root-anchored apps the location covers `/`; for subpath
+        // apps the prefix path.
+        $locationMatch = $app->isRootAnchored() ? '/' : $pathPrefix . '/';
+        // Named location per app. `@` prevents nginx from treating it
+        // as a URI (no location rematch, no alias inheritance drama).
+        $rampageLoc = '@' . $this->namedLocationLabel($app) . '_rampage';
+        // The front controller lives at a known absolute path so we
+        // hardcode SCRIPT_FILENAME. nginx's alias + try_files
+        // URI-fallback interaction mangles $fastcgi_script_name on the
+        // internal-redirect subrequest, and $request_filename inside
+        // the redirected location doesn't help either (measured on
+        // Ubuntu 24.04 with nginx 1.24 against the horde/bundle web
+        // layout). The named location bypasses both by carrying the
+        // absolute filename directly.
+        $frontControllerFile = $app->fileroot . '/' . $frontController;
+
         $header = $this->render->prerequisitesHeader('nginx', [
             'Prerequisites:',
             '  - nginx 1.18+',
-            '  - php-fpm reachable via the fastcgi_pass in the parent site block',
+            '  - php-fpm reachable via the parent server block',
             '  - Included from a `server { }` block in sites/',
             'Limitations:',
-            '  - The location blocks below must appear in the order emitted:',
-            '    forbid blocks first, front-controller fallback last.',
+            '  - Bare `/<app>/` (trailing slash) relies on the parent site',
+            '    file emitting a `rewrite ^(/[^/]+)/$ $1/index.php last;`',
+            '    so nginx behaves like Apache\'s `DirectoryIndex index.php`.',
             '',
             'App: ' . $app->id,
             'Fileroot: ' . $app->fileroot,
             'Webroot: ' . $app->webroot,
             $app->isRootAnchored()
                 ? 'Anchoring: root (parent server block sets `root` to fileroot; no alias here).'
-                : 'Anchoring: subpath (this snippet issues alias for ' . rtrim($app->pathPrefix(), '/') . '/).',
-            'Front controller: ' . $this->render->frontControllerFor($app),
+                : 'Anchoring: subpath (this snippet issues alias for ' . $pathPrefix . '/).',
+            'Front controller: ' . $frontController . ' (invoked via ' . $rampageLoc . ')',
         ]);
-        $frontController = $this->render->frontControllerFor($app);
-        $pathPrefix = rtrim($app->pathPrefix(), '/');
-        // For root-anchored apps the location covers `/`; for subpath
-        // apps the prefix path.
-        $locationMatch = $app->isRootAnchored() ? '/' : $pathPrefix . '/';
 
         $body = $header;
         // Forbid blocks. For root-anchored apps the paths are top-level
@@ -119,14 +134,35 @@ final class NginxEmitter
         if (!$app->isRootAnchored()) {
             $body .= "    alias " . $app->fileroot . "/;\n";
         }
-        // try_files fallback into the front controller. The target
-        // path uses the URL prefix so nginx routes correctly.
-        $tryTarget = $app->isRootAnchored()
-            ? '/' . $frontController
-            : $pathPrefix . '/' . $frontController;
-        $body .= "    try_files \$uri \$uri/ " . $tryTarget . "?\$args;\n";
+        // try_files tests $uri as a filesystem path. Real files
+        // (login.php, index.php by name, static assets) match here
+        // and get served directly — the server-scope `.php$` regex
+        // picks up any PHP among them. Everything else falls through
+        // to the named location which invokes the front controller.
+        $body .= "    try_files \$uri " . $rampageLoc . ";\n";
+        $body .= "}\n\n";
+
+        // Named location: hardcoded SCRIPT_FILENAME, PATH_INFO carries
+        // the requested URI so rampage's routing sees the same thing
+        // Apache would have handed it.
+        $body .= sprintf("location %s {\n", $rampageLoc);
+        $body .= "    include fastcgi_params;\n";
+        $body .= "    fastcgi_param SCRIPT_FILENAME " . $frontControllerFile . ";\n";
+        $body .= "    fastcgi_param PATH_INFO       \$uri;\n";
+        $body .= "    fastcgi_param HTTP_AUTHORIZATION \$http_authorization;\n";
+        $body .= "    " . $fastcgiDirective . "\n";
         $body .= "}\n";
         return $body;
+    }
+
+    /**
+     * nginx named-location labels must be lowercase word-chars and
+     * underscores. App ids like `horde-webmail` are legal in
+     * `.horde.yml` but not in nginx. Sanitize.
+     */
+    private function namedLocationLabel(AppEntry $app): string
+    {
+        return preg_replace('/[^a-z0-9_]+/', '_', strtolower($app->id)) ?? $app->id;
     }
 
     /**
@@ -210,6 +246,13 @@ final class NginxEmitter
             $body .= "    # root /var/www/html;\n";
         }
         $body .= "\n";
+        // DirectoryIndex-equivalent: bare `/<app>/` (any single URL
+        // segment with a trailing slash) rewrites to `/<app>/index.php`.
+        // The `.php$` regex below then executes it. Matches Apache's
+        // `DirectoryIndex index.php` without special-casing app ids.
+        // Deeper subdir requests (e.g. `/<app>/services/`) don't match
+        // and pass through to the per-app location.
+        $body .= "    rewrite ^(/[^/]+)/$ \$1/index.php last;\n\n";
         foreach ($apps as $app) {
             $body .= sprintf("    include %s/apps/%s.conf;\n", $includeBase, $app->id);
         }
