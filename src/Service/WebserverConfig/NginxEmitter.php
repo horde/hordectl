@@ -48,7 +48,7 @@ final class NginxEmitter
             $hostLabel = $host === '_default_' ? ($map->defaultHost ?: 'default') : $host;
             $entries[] = new EmitEntry(
                 $outputDir . '/sites/' . $hostLabel . '.conf',
-                $this->renderSite($hostLabel, $apps, $phpHandlerSpec, $prefix),
+                $this->renderSite($hostLabel, $apps, $phpHandlerSpec, $prefix, $map->bundleWebRoot),
             );
             if ($this->render->anyTls($apps)) {
                 $entries[] = new EmitEntry(
@@ -132,7 +132,7 @@ final class NginxEmitter
     /**
      * @param list<AppEntry> $apps
      */
-    private function renderSite(string $host, array $apps, string $phpHandlerSpec, string $prefix): string
+    private function renderSite(string $host, array $apps, string $phpHandlerSpec, string $prefix, string $bundleWebRoot = ''): string
     {
         [$fastcgiDirective, $handlerLabel] = $this->render->phpHandler($phpHandlerSpec, 'nginx');
         $anyTls = $this->render->anyTls($apps);
@@ -197,9 +197,16 @@ final class NginxEmitter
         $body .= "    server_name " . $host . ";\n";
         if ($rootApp !== null) {
             $body .= '    root ' . $rootApp->fileroot . ";\n";
+        } elseif ($bundleWebRoot !== '') {
+            // Tier-3 knows the bundle web root; that's the natural
+            // vhost root when no app owns `/`. Everything under
+            // `<bundle>/web/` (horde/, imp/, static/, js/, themes/)
+            // resolves under /<app>/, /static/*, /js/* etc.
+            $body .= '    root ' . $bundleWebRoot . ";\n";
         } else {
-            $body .= "    # No root-anchored app on this host. Set `root` manually\n";
-            $body .= "    # or add an --app-webroots entry pointing an app at " . $host . "/.\n";
+            $body .= "    # No root-anchored app on this host and no bundle web\n";
+            $body .= "    # root known (live-registry / stdin tiers). Set `root`\n";
+            $body .= "    # manually or regenerate with --root-bundle-path.\n";
             $body .= "    # root /var/www/html;\n";
         }
         $body .= "\n";

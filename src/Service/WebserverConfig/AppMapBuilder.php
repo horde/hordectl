@@ -136,7 +136,7 @@ final class AppMapBuilder
                 themesuri: $defaultUrl . '/themes/' . $id,
             );
         }
-        return $this->finalize($apps, $errors);
+        return $this->finalize($apps, $errors, $bundleWeb);
     }
 
     /**
@@ -191,8 +191,11 @@ final class AppMapBuilder
      *
      * @param list<AppEntry> $apps
      * @param list<string> $warnings Non-fatal warnings accumulated by callers.
+     * @param string $bundleWebRoot Filesystem path to `<bundle>/web/` when
+     *        the caller synthesized this map from a bundle layout. Empty
+     *        for live-registry and stdin tiers.
      */
-    private function finalize(array $apps, array $warnings): MapBuildResult
+    private function finalize(array $apps, array $warnings, string $bundleWebRoot = ''): MapBuildResult
     {
         if ($apps === []) {
             return MapBuildResult::failure('No apps discovered in the input payload.');
@@ -234,7 +237,7 @@ final class AppMapBuilder
                 }
             }
         }
-        return MapBuildResult::success($apps, $defaultHost, $defaultTls, $warnings);
+        return MapBuildResult::success($apps, $defaultHost, $defaultTls, $warnings, $bundleWebRoot);
     }
 
     /**
@@ -333,6 +336,6 @@ final class AppMapBuilder
                 themesuri: $app->themesuri,
             );
         }
-        return $this->finalize($updated, $warnings);
+        return $this->finalize($updated, $warnings, $map->bundleWebRoot);
     }
 }
