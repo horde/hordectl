@@ -123,11 +123,16 @@ class WebserverConfig implements Module, ModuleUsage
         }
         $this->cli->writeln();
         $this->cli->writeln('Input tiers (first available wins):');
-        $this->cli->writeln('  1. `hordectl query registry` against the current target.');
+        $this->cli->writeln('  1. `hordectl query registry` against the current target (default).');
         $this->cli->writeln('  2. --registry-in=-  Read a YAML registry payload from stdin');
         $this->cli->writeln('                      (the same shape `query registry` emits).');
-        $this->cli->writeln('  3. --default-url + --root-bundle-path (+ optional --app-webroots)');
-        $this->cli->writeln('     to synthesize from the vanilla Horde 6 bundle layout.');
+        $this->cli->writeln('  3. --root-bundle-path=<path> (+ optional --default-url and');
+        $this->cli->writeln('     --app-webroots) synthesizes from the vanilla Horde 6 bundle');
+        $this->cli->writeln('     layout. Use this for bootstrap ahead of a running registry.');
+        $this->cli->writeln();
+        $this->cli->writeln('CLI overrides layered on top of tiers 1 and 2:');
+        $this->cli->writeln('  --app-webroots=id|url,...   Replace per-app webroots');
+        $this->cli->writeln('  --default-url=<url>         Promote relative webroots to <url>/<path>');
         $this->cli->writeln();
     }
 
