@@ -20,10 +20,16 @@ namespace Horde\Hordectl\Service\WebserverConfig;
  *   sites/<host>.conf    Per-host server blocks
  *   tls/<host>.conf      Operator-owned TLS knobs (sketch mode)
  *
- * Ordering matters in nginx location dispatch. The emitter puts
- * forbid blocks (specific paths) before the alias-based front-controller
- * fallback, and the fastcgi handler goes at server scope so it applies
- * across every included location block.
+ * Ordering matters in nginx location dispatch. Every app is wrapped
+ * in a single `^~` prefix location so it wins over any regex location
+ * at server scope. Inside it the forbid blocks (specific paths) come
+ * first, the php handler next, and the front-controller fallback last.
+ *
+ * The php handler is scoped PER APP rather than at server scope: an
+ * aliased subpath location needs SCRIPT_FILENAME derived from the
+ * alias ($request_filename), whereas a root-anchored app served from
+ * the server-level `root` uses $document_root$fastcgi_script_name. A
+ * single server-scope handler cannot satisfy both.
  */
 final class NginxEmitter
 {
@@ -40,7 +46,7 @@ final class NginxEmitter
         foreach ($map->apps as $app) {
             $entries[] = new EmitEntry(
                 $outputDir . '/horde-includes/apps/' . $app->id . '.conf',
-                $this->renderAppSnippet($app),
+                $this->renderAppSnippet($app, $phpHandlerSpec),
             );
         }
         $byHost = $this->groupByHost($map);
@@ -74,54 +80,81 @@ final class NginxEmitter
         return $out;
     }
 
-    private function renderAppSnippet(AppEntry $app): string
+    private function renderAppSnippet(AppEntry $app, string $phpHandlerSpec): string
     {
+        [$fastcgiDirective] = $this->render->phpHandler($phpHandlerSpec, 'nginx');
+        $rootAnchored = $app->isRootAnchored();
+        $pathPrefix = rtrim($app->pathPrefix(), '/');
+        $frontController = $this->render->frontControllerFor($app);
+        // For root-anchored apps the location covers `/`; for subpath
+        // apps the prefix path.
+        $locationMatch = $rootAnchored ? '/' : $pathPrefix . '/';
+        // SCRIPT_FILENAME has to reflect the on-disk path php-fpm should
+        // execute. For a root-anchored app served from the server-level
+        // `root`, $document_root$fastcgi_script_name is correct. For an
+        // aliased subpath location that expression points at the server
+        // root, NOT the app's fileroot, so php-fpm would fail to find
+        // the script. $request_filename honours the alias and resolves
+        // to <fileroot>/<script>.
+        $scriptFilename = $rootAnchored
+            ? '$document_root$fastcgi_script_name'
+            : '$request_filename';
+
         $header = $this->render->prerequisitesHeader('nginx', [
             'Prerequisites:',
             '  - nginx 1.18+',
-            '  - php-fpm reachable via the fastcgi_pass in the parent site block',
+            '  - php-fpm listening at the fastcgi_pass emitted below',
             '  - Included from a `server { }` block in sites/',
             'Limitations:',
-            '  - The location blocks below must appear in the order emitted:',
-            '    forbid blocks first, front-controller fallback last.',
+            '  - The nested location blocks must keep the order emitted:',
+            '    forbid blocks first, php handler next, front-controller last.',
+            '  - PATH_INFO is not split out; front controllers that route on',
+            '    PATH_INFO need an operator-supplied fastcgi_split_path_info.',
             '',
             'App: ' . $app->id,
             'Fileroot: ' . $app->fileroot,
             'Webroot: ' . $app->webroot,
-            $app->isRootAnchored()
+            $rootAnchored
                 ? 'Anchoring: root (parent server block sets `root` to fileroot; no alias here).'
-                : 'Anchoring: subpath (this snippet issues alias for ' . rtrim($app->pathPrefix(), '/') . '/).',
-            'Front controller: ' . $this->render->frontControllerFor($app),
+                : 'Anchoring: subpath (this snippet issues alias for ' . $pathPrefix . '/).',
+            'Front controller: ' . $frontController,
         ]);
-        $frontController = $this->render->frontControllerFor($app);
-        $pathPrefix = rtrim($app->pathPrefix(), '/');
-        // For root-anchored apps the location covers `/`; for subpath
-        // apps the prefix path.
-        $locationMatch = $app->isRootAnchored() ? '/' : $pathPrefix . '/';
 
+        // The whole app lives inside one `^~` prefix location. `^~`
+        // makes this prefix win over any regex location at server scope,
+        // and nesting the php handler here is what lets SCRIPT_FILENAME
+        // pick up the alias for subpath apps.
         $body = $header;
-        // Forbid blocks. For root-anchored apps the paths are top-level
-        // (`/lib/`); for subpath apps they carry the prefix.
+        $body .= sprintf("location ^~ %s {\n", $locationMatch);
+        // Root-anchored apps rely on the server-level `root` directive;
+        // subpath apps get their own `alias` here.
+        if (!$rootAnchored) {
+            $body .= "    alias " . $app->fileroot . "/;\n";
+        }
+        $body .= "\n";
+        // Forbid blocks first. For root-anchored apps the paths are
+        // top-level (`/lib/`); for subpath apps they carry the prefix.
         foreach ($this->render->forbiddenDirs as $sub) {
             if (!is_dir($app->fileroot . '/' . $sub)) {
                 continue;
             }
             $body .= sprintf(
-                "location ~ ^%s%s/ { return 403; }\n",
-                $app->isRootAnchored() ? '/' : $pathPrefix . '/',
+                "    location ~ ^%s%s/ { return 403; }\n",
+                $rootAnchored ? '/' : $pathPrefix . '/',
                 $sub,
             );
         }
-        $body .= "\n";
-        $body .= sprintf("location %s {\n", $locationMatch);
-        // Root-anchored apps rely on the server-level `root` directive;
-        // subpath apps get their own `alias` here.
-        if (!$app->isRootAnchored()) {
-            $body .= "    alias " . $app->fileroot . "/;\n";
-        }
-        // try_files fallback into the front controller. The target
-        // path uses the URL prefix so nginx routes correctly.
-        $tryTarget = $app->isRootAnchored()
+        // PHP handler, scoped to this app so SCRIPT_FILENAME is correct.
+        $body .= "    location ~ \\.php$ {\n";
+        $body .= "        include fastcgi_params;\n";
+        $body .= "        fastcgi_param SCRIPT_FILENAME " . $scriptFilename . ";\n";
+        $body .= "        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;\n";
+        $body .= "        " . $fastcgiDirective . "\n";
+        $body .= "    }\n";
+        // try_files fallback into the front controller, last. The target
+        // path uses the URL prefix so the internal redirect re-enters
+        // this location and hits the php handler above.
+        $tryTarget = $rootAnchored
             ? '/' . $frontController
             : $pathPrefix . '/' . $frontController;
         $body .= "    try_files \$uri \$uri/ " . $tryTarget . "?\$args;\n";
@@ -134,7 +167,7 @@ final class NginxEmitter
      */
     private function renderSite(string $host, array $apps, string $phpHandlerSpec, string $prefix): string
     {
-        [$fastcgiDirective, $handlerLabel] = $this->render->phpHandler($phpHandlerSpec, 'nginx');
+        [, $handlerLabel] = $this->render->phpHandler($phpHandlerSpec, 'nginx');
         $anyTls = $this->render->anyTls($apps);
 
         // Identify the root-anchored app, if any. Only one is legal.
@@ -203,16 +236,11 @@ final class NginxEmitter
             $body .= "    # root /var/www/html;\n";
         }
         $body .= "\n";
+        // Each app snippet carries its own php handler (scoped to the
+        // app so SCRIPT_FILENAME honours the alias/root of that app).
         foreach ($apps as $app) {
             $body .= sprintf("    include %s/apps/%s.conf;\n", $includeBase, $app->id);
         }
-        $body .= "\n";
-        $body .= "    location ~ \\.php$ {\n";
-        $body .= "        include fastcgi_params;\n";
-        $body .= "        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;\n";
-        $body .= "        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;\n";
-        $body .= "        " . $fastcgiDirective . "\n";
-        $body .= "    }\n";
         if ($anyTls) {
             $body .= sprintf("\n    include %s/tls/%s.conf;\n", $includeBase, $host);
         }
