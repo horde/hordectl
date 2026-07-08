@@ -10,6 +10,4 @@ namespace Horde\Hordectl\Exception;
  * Used to signal that a target module successfully claimed and attempted
  * to handle a command, but the command execution failed.
  */
-class TargetModuleException extends ModuleException
-{
-}
+class TargetModuleException extends ModuleException {}

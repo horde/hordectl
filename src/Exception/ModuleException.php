@@ -19,6 +19,4 @@ use RuntimeException;
  * Used to signal that a module successfully claimed and attempted
  * to handle a command, but the command execution failed.
  */
-class ModuleException extends RuntimeException
-{
-}
+class ModuleException extends RuntimeException {}

@@ -1,8 +1,8 @@
 <?php
 
 namespace Horde\Hordectl\Command\Test;
-use Horde\Hordectl\Exception\TestModuleException;
 
+use Horde\Hordectl\Exception\TestModuleException;
 use Horde\Argv\Parser;
 use Horde\Cli\Cli as HordeCli;
 use Horde\Hordectl\AdminApiClientTrait;

@@ -31,9 +31,9 @@ class GenerateTest extends TestCase
         // Create temporary directory structure
         $this->tempDir = sys_get_temp_dir() . '/hordectl-test-' . uniqid();
         mkdir($this->tempDir);
-        mkdir($this->tempDir . '/var', 0755, true);
-        mkdir($this->tempDir . '/var/config', 0755, true);
-        mkdir($this->tempDir . '/var/config/horde', 0755, true);
+        mkdir($this->tempDir . '/var', 0o755, true);
+        mkdir($this->tempDir . '/var/config', 0o755, true);
+        mkdir($this->tempDir . '/var/config/horde', 0o755, true);
 
         $this->confPath = $this->tempDir . '/var/config/horde/conf.php';
 

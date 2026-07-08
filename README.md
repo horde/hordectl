@@ -84,6 +84,10 @@ Some backends may be readonly and will not allow adding/changing some resources.
 
 See doc dir for detailed explanations of possible input formats and their semantics
 
+## Translations
+
+`hordectl translation` (alias `i18n`) manages gettext-based translations across every Horde package discovered under a target's installation. It replaces the legacy `horde-translation` script with a modern PSR-4 implementation and covers the full workflow: extract, merge, compile, init, cleanup, compendium, update-help, make-help and commit. Two additional read-only subcommands, `diff` and `check`, compare committed and freshly-regenerated .pot / .po files after normalization so reviewers and CI can tell material changes apart from creation-date churn. Discovery keys off `.horde.yml` `type:`, so applications and libraries are picked up automatically without hardcoded package lists. See [doc/TRANSLATION.md](doc/TRANSLATION.md) for details.
+
 ## Intended uses
 
 If you need a verbatim backup, you might be better off with a snapshot of the database and vfs.
