@@ -13,7 +13,7 @@ authors:
     active: true
     role: lead
 version:
-  release: 1.0.0
+  release: 1.1.0
   api: 1.0.0alpha1
 state:
   release: stable
@@ -102,4 +102,4 @@ ci-platform:
     - ext-xmlwriter
 ci-platform-flags:
   needs_installer_plugin: true
-keywords:
+keywords: null

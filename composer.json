@@ -11,7 +11,7 @@
             "role": "lead"
         }
     ],
-    "time": "2026-06-30",
+    "time": "2026-07-08",
     "repositories": [],
     "require": {
         "php": "^8.2",
@@ -37,8 +37,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Horde\\Hordectl\\Test\\": "test/",
-            "Horde\\Hordectl\\Test\\Fixtures\\": "test/fixtures/"
+            "Horde\\Hordectl\\Test\\": "test/"
         }
     },
     "bin": [

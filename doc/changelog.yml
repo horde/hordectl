@@ -1,4 +1,14 @@
 ---
+1.1.0:
+  api: 1.1.0
+  state:
+    release: stable
+    api: stable
+  date: 2026-07-08
+  license:
+    identifier: LGPL-2.1-only
+    uri: https://spdx.org/licenses/LGPL-2.1-only.html
+  notes: "fix(webserver-config): nginx DirectoryIndex rewrite also covers bare /\nfeat(webserver-config): nginx per-app named-location front controller with hardcoded SCRIPT_FILENAME\nfeat(webserver-config): emitter derives site docroot from bundle web path\nci: dump /var/www/horde/web contents on failure to catch SCRIPT_FILENAME mismatches\nci: probe live HTTP endpoints and dump generated webserver config on failure\ndocs(install): add INSTALL_HORDE.md walkthrough with pivots\ndocs: flatten doc/Horde/Hordectl and consolidate examples under doc/examples/\nci: run install-integration under a matrix over apache2 and nginx\nci: rename job to make room for an nginx job\nci: hit /api/v1/admin/info readiness route and use hordectl-generated vhost config\nfeat(webserver-config): layer --app-webroots and --default-url on live registry and stdin tiers\nfeat(configure-session): add --ensure-session-secret to seed HKDF master\nfix(install): preserve empty JSON objects when rewriting composer.json\nfeat(webserver-config): add hordectl webserver-config subcommand for htaccess/apache-vhost/nginx generation\nfeat: hordectl translation command supersedes horde/base \"horde-translation\" tool\nfix(query): standardize error handling in query group and query permission\nfeat(query): add hordectl query registry to dump compiled registry via admin API\nchore(hordectl): ignore legacy .hordectl-secret file\ntest(hordectl): update stale tests to current SUT surface\nrefactor(hordectl): remove dead code from pre-AdminApiClient design\ndon't ship this\nfix(install): inline cross-device move and revert xlink_rename stub\nswitch to using horde-installer-plugin RecursiveCopy\nfix rename to manage cross-device link issues\nfix(phar): use null for box git-version (Box 4 schema rejects bool)"
 1.0.0:
   api: 1.0.0
   state:
