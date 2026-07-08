@@ -253,4 +253,86 @@ final class AppMapBuilder
         }
         return $out;
     }
+
+    /**
+     * Applies CLI-supplied overrides to an already-resolved map.
+     *
+     * Two knobs:
+     *   - $appWebrootsSpec, same `id|url,id|url,...` format the tier-3
+     *     synthesizer accepts. Every listed id has its webroot
+     *     replaced by the given URL. Unlisted apps stay untouched.
+     *   - $defaultUrl, an absolute base URL that fills in an anchor
+     *     host for apps whose registry-supplied webroot is relative
+     *     (e.g. '/imp/'). The path prefix is preserved; only the
+     *     scheme+host portion is added.
+     *
+     * Runs AFTER any tier resolved a map, so live-registry + stdin
+     * tiers can also benefit from the override surface. The tier-3
+     * synthesizer already consumes both flags inline; those flags
+     * are ignored here to avoid double-application.
+     *
+     * After overrides, re-runs collision detection and re-derives
+     * the default-host / TLS hint. Fails the whole result if
+     * overrides introduce a webroot collision.
+     */
+    public function applyOverrides(
+        MapBuildResult $map,
+        string $appWebrootsSpec = '',
+        string $defaultUrl = '',
+    ): MapBuildResult {
+        if (!$map->ok) {
+            return $map;
+        }
+        if ($appWebrootsSpec === '' && $defaultUrl === '') {
+            return $map;
+        }
+
+        $warnings = $map->warnings;
+
+        $overrides = [];
+        if ($appWebrootsSpec !== '') {
+            foreach (explode(',', $appWebrootsSpec) as $spec) {
+                $spec = trim($spec);
+                if ($spec === '') {
+                    continue;
+                }
+                $parts = preg_split('/[|=]/', $spec, 2);
+                if (!is_array($parts) || count($parts) !== 2) {
+                    $warnings[] = sprintf('Ignoring malformed --app-webroots entry: %s', $spec);
+                    continue;
+                }
+                $overrides[trim($parts[0])] = trim($parts[1]);
+            }
+        }
+
+        $anchor = rtrim($defaultUrl, '/');
+
+        $updated = [];
+        foreach ($map->apps as $app) {
+            $webroot = $app->webroot;
+            if (isset($overrides[$app->id])) {
+                $webroot = $overrides[$app->id];
+            } elseif ($anchor !== '' && !$app->isAbsolute()) {
+                // Relative webroot + operator-supplied anchor: promote
+                // the entry to absolute. Preserve the path prefix.
+                $webroot = $anchor . ($app->webroot !== '' ? '/' . ltrim($app->webroot, '/') : '/');
+            }
+            if ($webroot === $app->webroot) {
+                $updated[] = $app;
+                continue;
+            }
+            $updated[] = new AppEntry(
+                id: $app->id,
+                fileroot: $app->fileroot,
+                webroot: $webroot,
+                staticfs: $app->staticfs,
+                staticuri: $app->staticuri,
+                jsfs: $app->jsfs,
+                jsuri: $app->jsuri,
+                themesfs: $app->themesfs,
+                themesuri: $app->themesuri,
+            );
+        }
+        return $this->finalize($updated, $warnings);
+    }
 }

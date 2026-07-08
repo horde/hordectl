@@ -73,11 +73,13 @@ final class WebserverConfigOptions
         AppMapBuilder $builder,
         Output $output,
     ): MapBuildResult {
-        // Tier 3 wins when both flags are provided. Its whole point
-        // is bootstrapping ahead of a running registry.
-        if (!empty($opts->default_url) && !empty($opts->root_bundle_path)) {
+        // Tier 3 wins when --root-bundle-path is provided (with or
+        // without --default-url). Its whole point is bootstrapping
+        // ahead of a running registry; consumes --default-url and
+        // --app-webroots inline so no post-override pass is needed.
+        if (!empty($opts->root_bundle_path)) {
             return $builder->fromDefaults(
-                (string) $opts->default_url,
+                (string) ($opts->default_url ?? ''),
                 (string) $opts->root_bundle_path,
                 (string) ($opts->app_webroots ?? ''),
             );
@@ -90,16 +92,29 @@ final class WebserverConfigOptions
             if ($raw === false) {
                 $raw = '';
             }
-            return $builder->fromStdinYaml((string) $raw);
+            $map = $builder->fromStdinYaml((string) $raw);
+        } else {
+            // Tier 1: live registry via the admin API.
+            $client = $apiClientProvider();
+            if ($client === null) {
+                return MapBuildResult::failure(
+                    'No admin API client available. Pass --registry-in=- or --default-url + --root-bundle-path instead.',
+                );
+            }
+            $map = $builder->fromLiveRegistry($client);
         }
-        // Tier 1: live registry via the admin API.
-        $client = $apiClientProvider();
-        if ($client === null) {
-            return MapBuildResult::failure(
-                'No admin API client available. Pass --registry-in=- or --default-url instead.',
-            );
-        }
-        return $builder->fromLiveRegistry($client);
+
+        // Overrides layer on top of tier-1 and tier-2 results.
+        // --app-webroots replaces webroots per app id;
+        // --default-url promotes any remaining relative webroots to
+        // absolute ones anchored at the supplied host. Tier 3 has
+        // already consumed both flags inline; we skip this pass for
+        // that branch (returned early above).
+        return $builder->applyOverrides(
+            $map,
+            (string) ($opts->app_webroots ?? ''),
+            (string) ($opts->default_url ?? ''),
+        );
     }
 
     /**
@@ -111,7 +126,7 @@ final class WebserverConfigOptions
      */
     public static function classifyTier(object $opts): string
     {
-        if (!empty($opts->default_url) && !empty($opts->root_bundle_path)) {
+        if (!empty($opts->root_bundle_path)) {
             return 'defaults';
         }
         if (($opts->registry_in ?? '') === '-') {
