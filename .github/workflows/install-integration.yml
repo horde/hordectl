@@ -544,6 +544,17 @@ jobs:
             sudo cat /etc/nginx/horde-includes/apps/horde.conf 2>/dev/null || echo "no horde app conf"
           fi
           echo ""
+          echo "=== Filesystem: is rampage.php where the vhost expects it? ==="
+          # php-fpm's "Primary script unknown" errors usually mean the
+          # SCRIPT_FILENAME nginx or Apache computed doesn't exist on
+          # disk (or www-data can't read it). Both flavors resolve
+          # /horde/rampage.php against /var/www/horde/web/, so listing
+          # that directory shows exactly what the webserver would find.
+          sudo ls -la /var/www/horde/web/horde/ 2>&1 | head -20 || echo "no /var/www/horde/web/horde"
+          echo ""
+          echo "=== Filesystem: what does /var/www/horde/web/ look like? ==="
+          sudo ls -la /var/www/horde/web/ 2>&1 | head -30 || echo "no /var/www/horde/web"
+          echo ""
           echo "=== Horde Config ==="
           sudo cat /var/www/horde/var/config/horde/conf.php || echo "No conf.php"
           echo ""
