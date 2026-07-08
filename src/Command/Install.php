@@ -730,6 +730,13 @@ class Install implements Module, ModuleUsage
     /**
      * Set minimum-stability in composer.json
      *
+     * Decodes as an object rather than an assoc array. json_decode with
+     * assoc=true turns every empty JSON object `{}` into an empty PHP
+     * array `[]`, which json_encode then emits as `[]`. That flips
+     * fields like `"require-dev": {}` / `"suggest": {}` / `"autoload": {}`
+     * to arrays and fails composer's schema validation on the next
+     * `composer install`. Working on stdClass preserves object shape.
+     *
      * @param string $installDir Installation directory
      * @param string $stability Stability level (dev, alpha, beta, rc, stable)
      * @return bool True on success
@@ -741,12 +748,12 @@ class Install implements Module, ModuleUsage
             return false;
         }
 
-        $composerData = json_decode(file_get_contents($composerFile), true);
-        if (!is_array($composerData)) {
+        $composerData = json_decode((string) file_get_contents($composerFile));
+        if (!$composerData instanceof \stdClass) {
             return false;
         }
 
-        $composerData['minimum-stability'] = $stability;
+        $composerData->{'minimum-stability'} = $stability;
 
         $json = json_encode($composerData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
