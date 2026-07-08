@@ -128,7 +128,7 @@ class Cli implements Module
         try {
             $result = $CliModule->handle($globalOpts[1]);
             return $result ? 0 : 1;
-        } catch (\Horde\Hordectl\Exception\ModuleException $e) {
+        } catch (Exception\ModuleException $e) {
             // Module handled command but it failed
             // Error already displayed by module
             return 1;

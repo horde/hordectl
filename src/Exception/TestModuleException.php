@@ -16,6 +16,4 @@ namespace Horde\Hordectl\Exception;
  *
  * Future enhancement: Could track HTTP status, API errors vs test failures, etc.
  */
-class TestModuleException extends ModuleException
-{
-}
+class TestModuleException extends ModuleException {}

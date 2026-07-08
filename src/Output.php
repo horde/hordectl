@@ -14,6 +14,13 @@ namespace Horde\Hordectl;
 use Horde\Cli\Cli as HordeCli;
 use Horde\Cli\Output\Presenter;
 use Horde\Cli\Output\PresenterFactory;
+use Horde\Cli\Output\Presenter\Ci;
+use Horde\Cli\Output\Presenter\Unicode;
+use Horde\Hordectl\Output\AsciiTableRenderer;
+use Horde\Hordectl\Output\MarkdownTableRenderer;
+use Horde\Hordectl\Output\Table;
+use Horde\Hordectl\Output\TableRenderer;
+use Horde\Hordectl\Output\UnicodeTableRenderer;
 
 /**
  * Output facade for hordectl commands
@@ -118,5 +125,37 @@ class Output
     public function getPresenter(): Presenter
     {
         return $this->presenter;
+    }
+
+    /**
+     * Render a structured table.
+     *
+     * Chooses a renderer based on the concrete presenter type.
+     * Unicode presenter uses box-drawing borders. Ci presenter emits
+     * a markdown pipe table for GitHub Actions / GitLab CI log
+     * viewers. Everything else falls back to the classic ASCII grid.
+     *
+     * Suppressed under --quiet. This method is a phase-1 shim; phase 2
+     * pushes the renderer choice into the Presenter interface itself.
+     *
+     * @see ~/php/horde-development/tools/hordectl/table-presenter-sub-plan-2026-07-08.md
+     * @see ~/php/horde-development/libraries/cli/table-presenter-port-2026-07-08.md
+     */
+    public function table(Table $table): void
+    {
+        if ($this->quiet) {
+            return;
+        }
+        $renderer = $this->pickTableRenderer();
+        $renderer->render($table);
+    }
+
+    private function pickTableRenderer(): TableRenderer
+    {
+        return match (true) {
+            $this->presenter instanceof Unicode => new UnicodeTableRenderer($this->cli),
+            $this->presenter instanceof Ci      => new MarkdownTableRenderer($this->cli),
+            default                              => new AsciiTableRenderer($this->cli),
+        };
     }
 }

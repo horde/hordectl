@@ -32,6 +32,8 @@ use Horde\Cli\Modular\ModuleUsage;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use RuntimeException;
+use Exception;
+use ZipArchive;
 
 /**
  * Install Horde by downloading latest horde/bundle
@@ -400,7 +402,7 @@ class Install implements Module, ModuleUsage
 
                 // Return first tag (most recent)
                 return $tags[0]['name'] ?? null;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return null;
             }
         }
@@ -427,7 +429,7 @@ class Install implements Module, ModuleUsage
             }
 
             return file_put_contents($destination, (string) $response->getBody()) !== false;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -456,7 +458,7 @@ class Install implements Module, ModuleUsage
         if ($isZip) {
             // Use PHP's zip extension if available, fallback to unzip command
             if (class_exists('ZipArchive')) {
-                $zip = new \ZipArchive();
+                $zip = new ZipArchive();
                 if ($zip->open($archiveFile) !== true) {
                     @rmdir($tmpExtract);
                     return false;
@@ -937,7 +939,7 @@ class Install implements Module, ModuleUsage
             // Target exists, skip
             $this->cli->writeln("Target '{$targetName}' already exists, skipping creation.");
             return;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Target doesn't exist, continue to create it
         }
 

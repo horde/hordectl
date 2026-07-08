@@ -194,7 +194,7 @@ class Update implements Module
         $endpoint = rtrim($endpoint, '/');
         $candidates = [
             $endpoint,
-            $endpoint . '/horde'
+            $endpoint . '/horde',
         ];
 
         foreach ($candidates as $candidate) {
