@@ -4,8 +4,24 @@
 #
 # This script shows all the different ways to use the database configuration
 # command, including interactive mode, CLI arguments, and testing.
+#
+# Run from anywhere:  bash doc/examples/demos/demo-database-config.sh
 
 set -e
+
+# Resolve the repo root regardless of where this script is invoked from.
+# BASH_SOURCE[0] is this file's path (possibly relative). realpath makes
+# it absolute; three dirname hops walk up doc/examples/demos/ to the
+# repo root where bin/hordectl lives.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+HORDECTL="$REPO_ROOT/bin/hordectl"
+
+if [ ! -x "$HORDECTL" ]; then
+    echo "❌ Cannot find hordectl at: $HORDECTL"
+    echo "   (this demo expects to live at doc/examples/demos/)"
+    exit 1
+fi
 
 echo "=========================================="
 echo "hordectl configure database - Demonstration"
@@ -26,14 +42,14 @@ export HORDE_INSTALL_DIR="$DEMO_DIR"
 
 echo "1. Show help"
 echo "------------"
-../bin/hordectl configure database --help | head -20
+$HORDECTL configure database --help | head -20
 echo
 read -p "Press Enter to continue..."
 echo
 
 echo "2. Show current configuration (empty)"
 echo "--------------------------------------"
-../bin/hordectl configure database --show
+$HORDECTL configure database --show
 echo
 read -p "Press Enter to continue..."
 echo
@@ -41,7 +57,7 @@ echo
 echo "3. Configure database using CLI arguments"
 echo "-----------------------------------------"
 echo "Command:"
-echo "../bin/hordectl configure database \\"
+echo "$HORDECTL configure database \\"
 echo "  --type mysql \\"
 echo "  --host localhost \\"
 echo "  --username horde \\"
@@ -49,7 +65,7 @@ echo "  --password secret \\"
 echo "  --database horde \\"
 echo "  --charset utf8mb4"
 echo
-../bin/hordectl configure database \
+$HORDECTL configure database \
   --type mysql \
   --host localhost \
   --username horde \
@@ -62,14 +78,14 @@ echo
 
 echo "4. Show updated configuration"
 echo "-----------------------------"
-../bin/hordectl configure database --show
+$HORDECTL configure database --show
 echo
 read -p "Press Enter to continue..."
 echo
 
 echo "5. Test connection (will fail - no MySQL running)"
 echo "-------------------------------------------------"
-../bin/hordectl configure database --test || echo "Expected failure - no database running"
+$HORDECTL configure database --test || echo "Expected failure - no database running"
 echo
 read -p "Press Enter to continue..."
 echo
@@ -77,11 +93,11 @@ echo
 echo "6. Configure SQLite (file-based, no connection test)"
 echo "----------------------------------------------------"
 echo "Command:"
-echo "../bin/hordectl configure database \\"
+echo "$HORDECTL configure database \\"
 echo "  --type sqlite \\"
 echo "  --database $DEMO_DIR/horde.db"
 echo
-../bin/hordectl configure database \
+$HORDECTL configure database \
   --type sqlite \
   --database "$DEMO_DIR/horde.db"
 echo
@@ -90,7 +106,7 @@ echo
 
 echo "7. Show SQLite configuration"
 echo "----------------------------"
-../bin/hordectl configure database --show
+$HORDECTL configure database --show
 echo
 read -p "Press Enter to continue..."
 echo
@@ -120,16 +136,16 @@ echo
 echo "10. Update single value"
 echo "----------------------"
 echo "Command:"
-echo "../bin/hordectl configure database --charset utf8"
+echo "$HORDECTL configure database --charset utf8"
 echo
-../bin/hordectl configure database --charset utf8
+$HORDECTL configure database --charset utf8
 echo
 read -p "Press Enter to continue..."
 echo
 
 echo "11. Show final configuration"
 echo "---------------------------"
-../bin/hordectl configure database --show
+$HORDECTL configure database --show
 echo
 
 echo "=========================================="
