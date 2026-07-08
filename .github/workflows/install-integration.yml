@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  install-test:
+  install-test-ubuntu24.04-php8.4-mysql-apache2:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
