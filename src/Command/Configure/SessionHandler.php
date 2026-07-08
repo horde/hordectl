@@ -158,6 +158,13 @@ class SessionHandler implements Module, ModuleUsage
                     'help' => 'Show current session configuration',
                 ]
             ),
+            new Option(
+                '--ensure-session-secret',
+                [
+                    'action' => 'store_true',
+                    'help' => 'If $conf[secret_key] is empty after the run, autogenerate one and write it. Session HKDF key derivation refuses an empty master.',
+                ]
+            ),
         ];
     }
 
@@ -202,6 +209,15 @@ class SessionHandler implements Module, ModuleUsage
                 $this->cliMode($helper, $opts);
             }
 
+            // Optional post-processing: session HKDF derivation refuses an
+            // empty master ($conf['secret_key']). When the caller asks for
+            // it, ensure one exists before we save. Existing values are
+            // preserved untouched so we never rotate an operator's key
+            // by accident.
+            if ($opts->ensure_session_secret ?? false) {
+                $this->ensureSessionSecret($helper);
+            }
+
             // Save configuration
             $this->cli->writeln();
             $helper->save();
@@ -227,7 +243,8 @@ class SessionHandler implements Module, ModuleUsage
         return isset($opts->type) || isset($opts->path) || isset($opts->memcache)
                || isset($opts->timeout) || isset($opts->gc_maxlifetime) || isset($opts->gc_probability)
                || isset($opts->use_cookies) || isset($opts->cookie_secure) || isset($opts->cookie_httponly)
-               || isset($opts->cookie_domain);
+               || isset($opts->cookie_domain)
+               || ($opts->ensure_session_secret ?? false);
     }
 
     /**
@@ -405,6 +422,32 @@ class SessionHandler implements Module, ModuleUsage
             $displayValue = $opts->cookie_domain === '' ? '(empty - for localhost)' : $opts->cookie_domain;
             $this->cli->writeln("  Cookie domain: " . $displayValue);
         }
+    }
+
+    /**
+     * Ensure $conf['secret_key'] carries a non-empty value.
+     *
+     * Session HKDF derivation (see Horde_Core_Secret_Cbc's
+     * `hkdf-with-legacy-fallback` mode) refuses to run with an empty
+     * master. On a headless hordectl-driven install nothing else
+     * seeds this key, so this method fills the gap when the caller
+     * passes --ensure-session-secret.
+     *
+     * Existing non-empty values are preserved verbatim. This method
+     * never rotates a key an operator already installed.
+     */
+    private function ensureSessionSecret(ConfigHelper $helper): void
+    {
+        $current = (string) ($helper->getValue('secret_key') ?? '');
+        if ($current !== '') {
+            $this->output->info('  secret_key: already set, leaving untouched.');
+            return;
+        }
+        // 64 raw bytes → 88 base64 characters. Well above what any
+        // sane HKDF derivation would consider low-entropy.
+        $secret = base64_encode(random_bytes(64));
+        $helper->setValue('secret_key', $secret);
+        $this->output->ok('  secret_key: generated and injected (session HKDF master).');
     }
 
     /**
