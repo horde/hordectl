@@ -3,6 +3,10 @@
 Deploy scenarios for end to end tests from yaml files
 Patch desired configurations into horde backends without touching unrelated content
 
+For a full walkthrough (Ubuntu 24.04, MySQL, Apache or nginx, PHP 8.4, from
+empty host to logged-in user), see [doc/INSTALL_HORDE.md](doc/INSTALL_HORDE.md).
+Developer notes: [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md).
+
 ## Install into your Horde 6 deployment
 
 cd /var/www/horde-dev
