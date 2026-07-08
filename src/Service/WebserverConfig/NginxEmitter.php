@@ -246,13 +246,14 @@ final class NginxEmitter
             $body .= "    # root /var/www/html;\n";
         }
         $body .= "\n";
-        // DirectoryIndex-equivalent: bare `/<app>/` (any single URL
-        // segment with a trailing slash) rewrites to `/<app>/index.php`.
-        // The `.php$` regex below then executes it. Matches Apache's
-        // `DirectoryIndex index.php` without special-casing app ids.
-        // Deeper subdir requests (e.g. `/<app>/services/`) don't match
-        // and pass through to the per-app location.
-        $body .= "    rewrite ^(/[^/]+)/$ \$1/index.php last;\n\n";
+        // DirectoryIndex-equivalent: rewrite bare `/` and one-segment
+        // `/<app>/` to `/index.php` and `/<app>/index.php` respectively.
+        // The server-scope `.php$` regex below then executes them.
+        // Matches Apache's `DirectoryIndex index.php` without
+        // special-casing any app id. Deeper subdir requests (e.g.
+        // `/<app>/services/`) don't match and pass through to per-app
+        // locations.
+        $body .= "    rewrite ^(/([^/]+/)?)\$ \$1index.php last;\n\n";
         foreach ($apps as $app) {
             $body .= sprintf("    include %s/apps/%s.conf;\n", $includeBase, $app->id);
         }
