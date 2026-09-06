@@ -104,6 +104,14 @@ final class HtaccessEmitter
             . "<IfModule !authz_core_module>\n"
             . "    Allow from all\n"
             . "</IfModule>\n\n"
+            // Serve a directory's index.php natively (e.g.
+            // /<app>/services/portal/). The front-controller RewriteRule
+            // is guarded by `!-d`, so a real directory falls to
+            // DirectoryIndex instead of rampage.php. Set it explicitly
+            // rather than depending on an unstated server-global.
+            . "<IfModule mod_dir.c>\n"
+            . "    DirectoryIndex index.php\n"
+            . "</IfModule>\n\n"
             . "<IfModule mod_rewrite.c>\n"
             . "    RewriteEngine On\n"
             . "    RewriteRule .* - [env=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n"

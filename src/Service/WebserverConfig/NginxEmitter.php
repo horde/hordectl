@@ -101,9 +101,9 @@ final class NginxEmitter
             '  - php-fpm reachable via the parent server block',
             '  - Included from a `server { }` block in sites/',
             'Limitations:',
-            '  - Bare `/<app>/` (trailing slash) relies on the parent site',
-            '    file emitting a `rewrite ^(/[^/]+)/$ $1/index.php last;`',
-            '    so nginx behaves like Apache\'s `DirectoryIndex index.php`.',
+            '  - Deep directory-index paths (e.g. /<app>/services/portal/)',
+            '    are resolved to their index.php by the `if (-f ...)` rewrite',
+            '    in the app location, mirroring Apache\'s `DirectoryIndex`.',
             '',
             'App: ' . $app->id,
             'Fileroot: ' . $app->fileroot,
@@ -133,12 +133,35 @@ final class NginxEmitter
         // subpath apps get their own `alias` here.
         if (!$app->isRootAnchored()) {
             $body .= "    alias " . $app->fileroot . "/;\n";
+            // Subpath apps serve PHP from a nested handler. The outer
+            // location's `alias` breaks the server-scope `\.php$` regex
+            // for these paths (the regex would resolve against `root`,
+            // not the alias), so PHP under the prefix must be dispatched
+            // here with an alias-correct SCRIPT_FILENAME.
+            $body .= "    location ~ \\.php$ {\n";
+            $body .= "        include fastcgi_params;\n";
+            $body .= "        fastcgi_param SCRIPT_FILENAME \$request_filename;\n";
+            $body .= "        fastcgi_param PATH_INFO \$fastcgi_path_info;\n";
+            $body .= "        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;\n";
+            $body .= "        " . $fastcgiDirective . "\n";
+            $body .= "    }\n";
         }
+        // DirectoryIndex-equivalent for deep paths (e.g.
+        // /services/portal/). A `try_files $uri/index.php` fallback
+        // cannot serve these as PHP: a try_files file match is served
+        // inline in this location and never re-enters a `\.php$`
+        // handler, so nginx returns the raw source. Rewriting to the
+        // concrete index.php URI with `last` restarts location matching
+        // instead, letting the PHP handler claim it. The `-f` guard
+        // keeps genuine router paths falling through to the front
+        // controller.
+        $body .= "    if (-f \$request_filename/index.php) {\n";
+        $body .= "        rewrite ^ \$uri/index.php last;\n";
+        $body .= "    }\n";
         // try_files tests $uri as a filesystem path. Real files
-        // (login.php, index.php by name, static assets) match here
-        // and get served directly — the server-scope `.php$` regex
-        // picks up any PHP among them. Everything else falls through
-        // to the named location which invokes the front controller.
+        // (login.php, static assets) match here and are served
+        // directly. Everything else falls through to the named location
+        // which invokes the front controller.
         $body .= "    try_files \$uri " . $rampageLoc . ";\n";
         $body .= "}\n\n";
 

@@ -108,6 +108,13 @@ final class ApacheVhostEmitter
         $body .= sprintf("<Directory %s>\n", $app->fileroot);
         $body .= "    AllowOverride None\n";
         $body .= "    Options +FollowSymLinks -Indexes\n";
+        // Serve a directory's index.php natively (e.g.
+        // /<app>/services/portal/). The front-controller RewriteRule
+        // below is guarded by `!-d`, so a real directory is never sent
+        // to rampage.php — it falls to DirectoryIndex instead. Set it
+        // explicitly rather than depending on an unstated server-global
+        // DirectoryIndex, so the config is self-contained.
+        $body .= "    DirectoryIndex index.php\n";
         $body .= "    Require all granted\n\n";
         $body .= "    RewriteEngine On\n";
         // RewriteBase anchors the rewrite substitution so `rampage.php`
